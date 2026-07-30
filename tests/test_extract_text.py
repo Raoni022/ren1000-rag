@@ -16,10 +16,10 @@ from extract_text import (  # noqa: E402
     RE_SO_PAGINACAO,
     detectar_boilerplate,
     limpar_pagina,
+    fragmentos_orfaos,
     reflow,
     normalizar_unicode,
     relatorio_artigos,
-    repara_quebra_de_ligadura,
 )
 
 falhas: list[str] = []
@@ -116,34 +116,23 @@ checar(
     "Art. 1º da verificação",
 )
 
-print("\nreparo de palavra partida por ligadura")
-for partida, inteira in [
-    ("identific acao", "identificacao"),
-    ("verific ar", "verificar"),
-    ("classific adas", "classificadas"),
-    ("definiç ão", "definição"),          # quebra apos ç, com acento na direita
-    ("notific ações", "notificações"),
-    ("conflit os", "conflitos"),           # quebra apos t
-    ("fix ado", "fixado"),                 # quebra apos x
-    ("beneficiad as", "beneficiadas"),     # quebra apos d
-    ("suficien te", "suficiente"),         # caso "-n te"
-    ("insuficien te", "insuficiente"),
-    ("flutuan te", "flutuante"),
-]:
-    checar(f"{partida!r} remontada", repara_quebra_de_ligadura(partida)[0], inteira)
-
-# Falsos positivos reais, colhidos rodando a regra contra o PDF da norma.
-for legitima in ["para fins de", "o perfil de carga", "que se beneficia ou utiliza",
-                 "verifique nas condicoes", "classificada na modalidade",
-                 "o prazo definido no contrato", "simplificado para o consumidor",
-                 "eficaz no prazo", "meio eficaz de comunicacao"]:
-    checar(f"{legitima!r} preservada", repara_quebra_de_ligadura(legitima)[0], legitima)
-
+print("\nguarda de regressao do extrator (palavra partida ao meio)")
+# Amostras reais do que o pypdf em modo layout produzia e que motivou a troca por pdfplumber.
 checar(
-    "juncoes sao registradas para auditoria, nao so contadas",
-    repara_quebra_de_ligadura("identific acao e verific acao para fins de teste")[1],
-    ["identific acao", "verific acao"],
+    "detecta consoante solta antes da palavra",
+    fragmentos_orfaos("o f aturamento mensal e a c ompensacao"),
+    [("f aturamento", 1), ("c ompensacao", 1)],
 )
+checar(
+    "conta ocorrencias repetidas",
+    fragmentos_orfaos("r evisao e r evisao"),
+    [("r evisao", 2)],
+)
+checar("texto sao nao acusa nada", fragmentos_orfaos("o faturamento mensal"), [])
+# Vogal solta e palavra legitima em portugues; maiuscula solta e inciso romano ou subgrupo.
+checar("vogal solta ignorada", fragmentos_orfaos("a distribuidora e o consumidor"), [])
+checar("inciso romano maiusculo ignorado", fragmentos_orfaos("o inciso V do artigo"), [])
+checar("subgrupo tarifario ignorado", fragmentos_orfaos("o grupo B deve observar"), [])
 
 print("\ndeteccao de cabecalho/rodape")
 paginas = [

@@ -2,7 +2,10 @@
 # NAO usar 3.14: torch/faiss-cpu ainda nao publicam wheel para essa versao.
 
 # --- Build-time: scripts/ (rodados uma vez, offline, para construir o indice) ---
-pypdf>=6.0                      # extracao de texto do PDF oficial da ANEEL
+# pdfplumber e nao pypdf: o pypdf insere espacos dentro das palavras neste PDF
+# ("identific acao"). Medicao e justificativa no docstring de scripts/extract_text.py.
+# Licenca MIT, como o pdfminer.six em que ele se apoia.
+pdfplumber>=0.11
 
 # --- Build-time + runtime: busca semantica ---
 sentence-transformers>=3.0      # embeddings multilingues (roda local, sem API paga)

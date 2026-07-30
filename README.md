@@ -97,37 +97,43 @@ conteúdo perdido na extração. Depois de conferir:
 ```
 
 Resultado esperado no PDF de referência: 152 páginas, 679 artigos sem buraco na sequência,
-589 palavras remontadas, ~738 mil caracteres.
+**0 palavras partidas**, ~737 mil caracteres. Leva cerca de 1 minuto.
 
-#### Duas armadilhas deste PDF, medidas e tratadas
+#### Por que pdfplumber e não pypdf
 
-**`extraction_mode="layout"` é obrigatório.** No modo `plain` o pypdf devolve cada página como
-uma única linha de ~5.700 caracteres, sem quebra nenhuma, e cola palavras vizinhas
-(`consumidoracom microgeração`). Só 30 artigos ficam reconhecíveis. Com `layout`: 679.
+Foi a decisão que mais afetou a qualidade do texto, e vale registrar porque a lição não é
+específica deste projeto: **a qualidade da extração se decide na escolha da biblioteca, não no
+pós-processamento.**
 
-**O modo `layout` insere um espaço espúrio depois da ligadura tipográfica `ﬁ`/`ﬂ`.** Efeito
-medido: `identificação` aparecia 49 vezes como `identific ação` e **zero vez inteira** — idem
-`verificação` (51), `notificação` (44), `classificação` (43). O reparo usa uma regra
-ortográfica, não lista de palavras: junta quando o fragmento da esquerda contém `fi`/`fl` e
-termina em letra que palavra portuguesa nunca tem no fim, o que separa `identific ação` de
-pares legítimos como `fins de` ou `classificada na`.
+O pypdf falha nos dois modos que oferece:
 
-#### Limitação conhecida: palavras partidas por letra solta
+| | `plain` | `layout` | pdfplumber |
+|---|---|---|---|
+| Artigos reconhecíveis (de 679) | 30 | 679 | **679** |
+| Quebras após ligadura `ﬁ`/`ﬂ` | — | 570 | **0** |
+| Letras soltas no meio de palavra | — | 39 | **0** |
+| `identificação` inteira no documento | — | 0x | **49x** |
+| Palavras coladas | sim | não | não |
+| Tempo | 36s | 36s | 62s |
 
-O mesmo defeito de espaçamento também parte a palavra na **primeira ou na última letra** —
-`f aturamento` (9x), `c ompetentes` (6x), `fie l cumprimento` — em cerca de 39 ocorrências, e
-essas **não são corrigidas**. Não há regra segura sobre o texto já extraído:
+No modo `plain` cada página vem como uma única linha de ~5.700 caracteres, sem quebra, colando
+palavras vizinhas (`consumidoracom microgeração`). No modo `layout` as quebras de linha saem
+certas, mas ele insere espaços **dentro** das palavras: `identific ação`, `f aturamento`,
+`fie l cumprimento`. `identificação` e `verificação` não apareciam inteiras uma vez sequer.
 
-- o fragmento órfão pode pertencer à palavra da esquerda ou à da direita (`fie l cumprimento`
-  é *"garantia de fiel cumprimento"*, não *"fie lcumprimento"*);
-- o tamanho do vão não distingue os casos: `fie    l` (4 espaços) é quebra interna, mas
-  `fiel      cumprimento` (6 espaços) é fronteira legítima;
-- juntar letra maiúscula quebraria a norma, porque ali são incisos romanos e subgrupos
-  tarifários reais (`V do`, `B deve`, `X ou`).
+Chegou-se a escrever ~120 linhas de regex para remontar essas palavras — e elas funcionavam
+para o caso da ligadura (589 remontagens corretas), mas não para a letra solta, que é
+irrecuperável a partir do texto já extraído: o fragmento pode pertencer à palavra da esquerda
+ou à da direita (`fie l cumprimento` é *"garantia de fiel cumprimento"*), o tamanho do vão não
+distingue quebra interna de fronteira legítima (`fie    l` tem 4 espaços, `fiel      cumprimento`
+tem 6), e juntar maiúscula quebraria incisos romanos e subgrupos tarifários reais (`V do`,
+`B deve`).
 
-O `--report` lista essas ocorrências em vez de escondê-las. A correção de verdade é trocar o
-extrator por um com melhor reconstrução de espaçamento (PyMuPDF/pdfplumber) — pendente de
-decisão, por adicionar dependência.
+O pdfplumber reconstrói a palavra pela posição dos glifos e zera os dois defeitos, o que
+permitiu apagar todo esse código. O minuto a mais é irrelevante num script que roda uma vez.
+
+Restou de guarda a função `fragmentos_orfaos()`: se a contagem de palavras partidas voltar a
+subir, a extração regrediu.
 
 ### Testes
 
