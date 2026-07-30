@@ -1,0 +1,14 @@
+# Python 3.11 (o venv local usa `py -3.11`; o HF Spaces roda 3.10/3.11).
+# NAO usar 3.14: torch/faiss-cpu ainda nao publicam wheel para essa versao.
+
+# --- Build-time: scripts/ (rodados uma vez, offline, para construir o indice) ---
+pypdf>=6.0                      # extracao de texto do PDF oficial da ANEEL
+
+# --- Build-time + runtime: busca semantica ---
+sentence-transformers>=3.0      # embeddings multilingues (roda local, sem API paga)
+faiss-cpu>=1.8                  # indice vetorial
+
+# --- Runtime: app.py ---
+gradio>=5.0                     # interface
+google-generativeai>=0.8        # LLM apenas para formular a resposta (free tier)
+python-dotenv>=1.0              # carrega GEMINI_API_KEY em dev local
