@@ -128,7 +128,7 @@ RE_QUEBRA_NTE = re.compile(r"\b(\w*(?:fi|fl)\w*n) (te)\b", re.IGNORECASE)
 # Normalizacao de texto
 # --------------------------------------------------------------------------------------
 
-def repara_quebra_de_ligadura(texto: str) -> tuple[str, int]:
+def repara_quebra_de_ligadura(texto: str) -> tuple[str, list[str]]:
     """Remonta palavras partidas por um espaco espurio depois da ligadura ﬁ/ﬂ.
 
     A regra e ortografica, nao uma lista de palavras: junta quando o fragmento da esquerda
@@ -143,18 +143,43 @@ def repara_quebra_de_ligadura(texto: str) -> tuple[str, int]:
     ponto do documento --: medido, ela nao tem sinal nenhum aqui, porque a quebra ocorre em
     TODA ocorrencia da palavra ("identificação" e "suficiente" aparecem zero vez inteiras).
 
-    Devolve (texto reparado, numero de junções feitas).
+    Devolve (texto reparado, lista das junções feitas no formato "esquerda direita").
+    A lista -- e nao so a contagem -- existe para o --report poder exibir exatamente o que foi
+    alterado no texto da norma: uma correcao automatica que ninguem consegue conferir e
+    indistinguivel de uma corrupcao silenciosa do documento.
     """
-    juncoes = 0
+    juncoes: list[str] = []
 
     def _junta(m: re.Match[str]) -> str:
-        nonlocal juncoes
-        juncoes += 1
+        juncoes.append(f"{m.group(1)} {m.group(2)}")
         return f"{m.group(1)}{m.group(2)}"
 
     texto = RE_QUEBRA_LIGADURA.sub(_junta, texto)
     texto = RE_QUEBRA_NTE.sub(_junta, texto)
     return texto, juncoes
+
+
+def fragmentos_orfaos(texto: str, limite: int = 12) -> list[tuple[str, int]]:
+    """Letras soltas deixadas por quebras internas que NENHUMA regra local resolve.
+
+    O modo layout as vezes parte a palavra logo depois da primeira letra ("f aturamento",
+    "c ompensacao") ou logo antes da ultima ("fie l", "financeir a"). Nao da para corrigir com
+    seguranca a partir do texto ja extraido, porque:
+
+      - o orfao pode pertencer a palavra da esquerda ou a da direita. "fie l cumprimento" e
+        "garantia de fiel cumprimento", nao "fie lcumprimento";
+      - o comprimento do vao nao distingue os casos: "fie    l" (4 espacos) e quebra interna,
+        mas "fiel      cumprimento" (6 espacos) e fronteira legitima de palavra;
+      - juntar letra maiuscula quebraria a norma, porque ali sao incisos romanos e subgrupos
+        tarifarios reais ("V do", "B deve", "X ou").
+
+    Por isso esta funcao so RELATA. A correcao de verdade e trocar o extrator -- ver a secao
+    de limitacoes do README.
+    """
+    orfaos: Counter[str] = Counter()
+    for m in re.finditer(r"(?<![\w-])([b-df-hj-np-tv-zç]) ([a-zà-ÿ]{2,})", texto):
+        orfaos[f"{m.group(1)} {m.group(2)}"] += 1
+    return orfaos.most_common(limite)
 
 
 def candidatas_residuais(texto: str, limite: int = 15) -> list[tuple[str, int]]:
@@ -390,6 +415,12 @@ def main() -> int:
         action="store_true",
         help="Nao remontar palavras partidas por ligadura (util para medir o efeito).",
     )
+    parser.add_argument(
+        "--show-joins",
+        action="store_true",
+        help="Listar todas as palavras remontadas, com frequencia. Use para auditar o que o "
+        "script alterou no texto da norma antes de confiar na saida.",
+    )
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -430,7 +461,7 @@ def main() -> int:
 
     texto = "\n".join(partes)
 
-    juncoes = 0
+    juncoes: list[str] = []
     if not args.no_ligature_fix:
         texto, juncoes = repara_quebra_de_ligadura(texto)
 
@@ -446,7 +477,8 @@ def main() -> int:
     print(f"Caracteres apos limpeza .... {len(texto):,}")
     print(f"Linhas de boilerplate ...... {total_removidas} "
           f"({len(boilerplate)} padroes distintos)")
-    print(f"Palavras remontadas ........ {juncoes} (quebra por ligadura)")
+    print(f"Palavras remontadas ........ {len(juncoes)} "
+          f"({len(set(juncoes))} distintas, quebra por ligadura)")
     print(f"Blocos de texto ............ {len([b for b in texto.split(chr(10)) if b])}")
     print(f"Artigos detectados ......... {len(numeros)}", end="")
     if numeros:
@@ -469,6 +501,23 @@ def main() -> int:
             f"conteudo que nao vale mais."
         )
 
+    if juncoes and args.show_joins:
+        print("\nJuncoes aplicadas ao texto da norma (esquerda + direita -> resultado):")
+        for termo, n in Counter(juncoes).most_common():
+            print(f"  {n:>4}x  {termo!r} -> {termo.replace(' ', '')!r}")
+
+    orfaos = fragmentos_orfaos(texto)
+    if orfaos:
+        total = sum(n for _, n in orfaos)
+        print(
+            f"\nLIMITACAO CONHECIDA: {total}+ palavra(s) partida(s) por letra solta, sem "
+            f"correcao segura.\n  O modo layout parte a palavra na primeira ou na ultima "
+            f"letra e nao ha sinal que\n  distinga isso de fronteira legitima. Afeta termos "
+            f"centrais da norma. Ver README."
+        )
+        for termo, n in orfaos:
+            print(f"  {n:>4}x  {termo!r}")
+
     residuais = candidatas_residuais(texto)
     if residuais:
         print("\nPares suspeitos de quebra NAO tratada (revisar se sao palavras legitimas):")
@@ -485,7 +534,9 @@ def main() -> int:
         return 0
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(texto, encoding="utf-8")
+    # newline="\n" explicito: sem isso o Windows grava CRLF e o artefato versionado fica
+    # diferente conforme a maquina que rodou o script.
+    args.output.write_text(texto, encoding="utf-8", newline="\n")
     print(f"\nEscrito: {args.output}")
     return 0
 

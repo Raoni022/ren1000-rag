@@ -140,9 +140,9 @@ for legitima in ["para fins de", "o perfil de carga", "que se beneficia ou utili
     checar(f"{legitima!r} preservada", repara_quebra_de_ligadura(legitima)[0], legitima)
 
 checar(
-    "contagem de juncoes",
+    "juncoes sao registradas para auditoria, nao so contadas",
     repara_quebra_de_ligadura("identific acao e verific acao para fins de teste")[1],
-    2,
+    ["identific acao", "verific acao"],
 )
 
 print("\ndeteccao de cabecalho/rodape")

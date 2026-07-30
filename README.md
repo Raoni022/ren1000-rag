@@ -112,6 +112,23 @@ ortográfica, não lista de palavras: junta quando o fragmento da esquerda cont�
 termina em letra que palavra portuguesa nunca tem no fim, o que separa `identific ação` de
 pares legítimos como `fins de` ou `classificada na`.
 
+#### Limitação conhecida: palavras partidas por letra solta
+
+O mesmo defeito de espaçamento também parte a palavra na **primeira ou na última letra** —
+`f aturamento` (9x), `c ompetentes` (6x), `fie l cumprimento` — em cerca de 39 ocorrências, e
+essas **não são corrigidas**. Não há regra segura sobre o texto já extraído:
+
+- o fragmento órfão pode pertencer à palavra da esquerda ou à da direita (`fie l cumprimento`
+  é *"garantia de fiel cumprimento"*, não *"fie lcumprimento"*);
+- o tamanho do vão não distingue os casos: `fie    l` (4 espaços) é quebra interna, mas
+  `fiel      cumprimento` (6 espaços) é fronteira legítima;
+- juntar letra maiúscula quebraria a norma, porque ali são incisos romanos e subgrupos
+  tarifários reais (`V do`, `B deve`, `X ou`).
+
+O `--report` lista essas ocorrências em vez de escondê-las. A correção de verdade é trocar o
+extrator por um com melhor reconstrução de espaçamento (PyMuPDF/pdfplumber) — pendente de
+decisão, por adicionar dependência.
+
 ### Testes
 
 Cada script é testável isoladamente. As funções de limpeza não dependem do PDF:
@@ -119,8 +136,6 @@ Cada script é testável isoladamente. As funções de limpeza não dependem do 
 ```bash
 .venv/Scripts/python.exe tests/test_extract_text.py
 ```
-
----
 
 ---
 
