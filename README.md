@@ -142,7 +142,12 @@ Cada script é testável isoladamente. As funções de limpeza não dependem do 
 ```bash
 .venv/Scripts/python.exe tests/test_extract_text.py
 .venv/Scripts/python.exe tests/test_chunk_text.py
+.venv/Scripts/python.exe tests/test_build_index.py
+.venv/Scripts/python.exe tests/test_retriever.py
 ```
+
+Nenhum deles baixa o modelo de embedding: os testes do índice e da busca usam vetores
+conhecidos, para cobrir a lógica que erra em silêncio (filtro, ordenação, sincronia).
 
 ---
 
@@ -197,6 +202,29 @@ estão em constantes compartilhadas com o retriever:
 busca exata leva menos de um milissegundo. IVF ou HNSW só compensam em corpus ordens de
 grandeza maiores, e custariam recall.
 
+### 5. Buscar
+
+```bash
+.venv/Scripts/python.exe -m src.retriever "prazo para analisar pedido de acesso" -k 3
+```
+
+`src/retriever.py` carrega modelo, índice e chunks sob demanda e mantém em cache na instância —
+dentro do app, uma instância atende todas as perguntas sem recarregar 470 MB por requisição.
+
+**O filtro de vigência mora aqui, não no prompt.** Dos 1.188 chunks, 108 não estão em vigor.
+O padrão devolve só `vigente`, porque o que não chega ao contexto não pode ser citado por
+engano — deixar o LLM julgar vigência seria pedir a ele algo que o metadado já resolve de forma
+determinística. `situacoes=None` desliga o filtro, para perguntas do tipo "o que este artigo
+dizia antes?".
+
+O carregamento confere que o índice e o `chunks.json` têm o mesmo tamanho. Se vierem de
+execuções diferentes, a posição no índice deixa de apontar para o artigo certo e a busca passa
+a devolver **o artigo errado para o vetor certo**, sem erro nenhum.
+
+Modelo e prefixos do E5 ficam em `src/config.py`, lido tanto pelo build quanto pela busca. A
+dependência aponta de `scripts/` para `src/`, nunca o contrário: o índice tem que ser
+construído com o que o runtime espera.
+
 #### Dois achados que definem o Bloco 4 e o 5
 
 **A faixa de similaridade é estreita demais para servir de filtro.** Medido no índice pronto:
@@ -213,11 +241,32 @@ Sete centésimos separam uma pergunta legítima de teclado aleatório. **Não d�
 gerador (Bloco 5), que decide a partir do conteúdo dos trechos, não da nota da busca.
 
 **As definições do Art. 2 são mal recuperadas.** "Diferença entre micro e minigeração em
-potência" traz o alvo em rank 26; "geração compartilhada" em rank 47 — ambas fora do top-5, e
-ambas são perguntas da bateria de aceitação. A causa provável é o empacotamento: cada chunk do
-Art. 2 junta ~4 definições sem relação entre si sob um caput genérico, e o vetor vira a média
-delas. Medido: a definição isolada pontua +0,010 e +0,037 acima do chunk empacotado, o que
-nessa faixa comprimida é significativo. Ajuste a testar no Bloco 4/7.
+potência" traz o alvo em rank 25; "geração compartilhada" em rank 41 — ambas fora do top-5, e
+ambas são perguntas da bateria de aceitação. **Continua em aberto** (ver abaixo).
+
+#### Uma hipótese testada e descartada
+
+A suspeita era o empacotamento: cada chunk do Art. 2 junta ~4 definições sem relação entre si,
+e o vetor viraria a média delas. A definição isolada de fato pontua +0,010 e +0,037 acima do
+chunk empacotado.
+
+Só que isso não se traduziu em ranking. Refazendo os chunks com fragmento menor
+(`--fragment-chars`) e remedindo o rank do alvo:
+
+| Pergunta | 1.200 (atual) | 400 | 250 |
+|---|---|---|---|
+| micro × minigeração em potência | 25 | 102 | 53 |
+| geração compartilhada | 41 | 11 | 33 |
+| validade dos créditos | **1** | 1 | 1 |
+| prazo de análise do acesso | **3** | 11 | 11 |
+
+Fragmentar melhora o score do alvo, mas melhora também o de centenas de concorrentes, e o
+efeito líquido foi negativo. O padrão continua sendo fragmento = `--max-chars`; a flag ficou
+como ferramenta de inspeção.
+
+O que resta tentar no Bloco 7 é busca híbrida (BM25 + densa): a pergunta contém literalmente
+"microgeração" e "minigeração", e casamento léxico resolveria o que a similaridade semântica
+não resolve. Custa uma dependência nova, então fica para decidir.
 
 ---
 
@@ -280,7 +329,7 @@ art. 323, e a MP 1.300/2025 alterou a aplicação da tarifa social.
 | 1 | Extração e limpeza do PDF → `data/ren1000_raw.txt` | **concluído** — 679 artigos, sem buracos |
 | 2 | Chunking por dispositivo → `index/chunks.json` (+ metadado de vigência) | **concluído** — 1.188 chunks, 0 blocos perdidos |
 | 3 | Embeddings + índice FAISS | **concluído** — e5-small, 1.188 vetores, 1 truncado |
-| 4 | Retriever (query → top-k) | a fazer — filtrar por `situacao`; rever chunk do Art. 2 |
+| 4 | Retriever (query → top-k) | **concluído** — filtra por `situacao`, sem limiar de score |
 | 5 | Generator (prompt restrito + LLM) | a fazer — o "não encontrei" é aqui, não por limiar |
 | 6 | Interface Gradio | a fazer |
 | 7 | Bateria de 10 perguntas de teste | a fazer |

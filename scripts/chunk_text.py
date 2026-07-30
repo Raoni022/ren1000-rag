@@ -344,7 +344,7 @@ class Fragmento:
         self.n_dispositivos = n_dispositivos
 
 
-def fragmentar(unidade: Unidade, max_chars: int) -> list[Fragmento]:
+def fragmentar(unidade: Unidade, max_chars: int, alvo: int | None = None) -> list[Fragmento]:
     """Divide uma unidade grande demais, REPETINDO a cabeca em cada pedaco.
 
     O Art. 2 e o caso que exige isso: um caput ("sao adotadas as seguintes definicoes:")
@@ -358,13 +358,17 @@ def fragmentar(unidade: Unidade, max_chars: int) -> list[Fragmento]:
     if len(unidade.texto) <= max_chars or len(unidade.linhas) == 1:
         return [Fragmento(unidade.texto, unidade.situacao, unidade.tipo, 1)]
 
+    # `alvo` permite fatiar mais fino do que o teto de empacotamento. Faz diferenca no Art. 2,
+    # onde os subordinados sao definicoes independentes entre si: juntar quatro delas num
+    # chunk faz o vetor virar a media de quatro assuntos distintos.
+    teto = alvo or max_chars
     cabeca = unidade.linhas[0]
     partes: list[Fragmento] = []
     atual: list[str] = []
     tamanho = len(cabeca)
 
     for subordinado in unidade.linhas[1:]:
-        if atual and tamanho + len(subordinado) > max_chars:
+        if atual and tamanho + len(subordinado) > teto:
             partes.append(
                 Fragmento("\n".join([cabeca] + atual), unidade.situacao, unidade.tipo, len(atual))
             )
@@ -379,7 +383,9 @@ def fragmentar(unidade: Unidade, max_chars: int) -> list[Fragmento]:
     return partes
 
 
-def agrupar(unidades: list[Unidade], max_chars: int) -> list[list[Fragmento]]:
+def agrupar(
+    unidades: list[Unidade], max_chars: int, alvo_fragmento: int | None = None
+) -> list[list[Fragmento]]:
     """Fragmenta o que e grande demais e empacota o resto ate max_chars.
 
     Nunca mistura situacoes no mesmo grupo: e o que mantem o metadado util no Bloco 4. Um
@@ -388,7 +394,7 @@ def agrupar(unidades: list[Unidade], max_chars: int) -> list[list[Fragmento]]:
     """
     fragmentos: list[Fragmento] = []
     for unidade in unidades:
-        fragmentos.extend(fragmentar(unidade, max_chars))
+        fragmentos.extend(fragmentar(unidade, max_chars, alvo_fragmento))
 
     grupos: list[list[Fragmento]] = []
     atual: list[Fragmento] = []
@@ -408,11 +414,13 @@ def agrupar(unidades: list[Unidade], max_chars: int) -> list[list[Fragmento]]:
     return grupos
 
 
-def montar_chunks(artigos: list[Artigo], max_chars: int) -> list[dict]:
+def montar_chunks(
+    artigos: list[Artigo], max_chars: int, alvo_fragmento: int | None = None
+) -> list[dict]:
     chunks: list[dict] = []
 
     for artigo in artigos:
-        for grupo in agrupar(artigo.unidades, max_chars):
+        for grupo in agrupar(artigo.unidades, max_chars, alvo_fragmento):
             texto = "\n".join(f.texto for f in grupo)
             situacao = grupo[0].situacao  # agrupar() garante grupo homogeneo
 
@@ -459,6 +467,13 @@ def main() -> int:
         help="Teto por chunk (padrao: 1200). Precisa caber na janela do modelo de embedding "
         "do Bloco 3: ~450 chars para uma janela de 128 tokens, ~1800 para 512.",
     )
+    parser.add_argument(
+        "--fragment-chars",
+        type=int,
+        default=None,
+        help="Teto ao fatiar uma unidade grande demais (padrao: o mesmo de --max-chars). "
+        "Valor menor separa subordinados independentes entre si, como as definicoes do Art. 2.",
+    )
     parser.add_argument("--report", action="store_true", help="Só relata, nao escreve.")
     args = parser.parse_args()
 
@@ -469,7 +484,7 @@ def main() -> int:
 
     blocos = [b for b in args.input.read_text(encoding="utf-8").split("\n") if b.strip()]
     artigos, preambulo = parsear(blocos)
-    chunks = montar_chunks(artigos, args.max_chars)
+    chunks = montar_chunks(artigos, args.max_chars, args.fragment_chars)
 
     tamanhos = sorted(len(c["texto"]) for c in chunks)
     por_situacao = Counter(c["situacao"] for c in chunks)

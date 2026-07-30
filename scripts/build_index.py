@@ -55,10 +55,15 @@ from pathlib import Path
 
 import numpy as np
 
-# Prefixos exigidos pelo E5. O Bloco 4 importa PREFIXO_QUERY daqui para nao divergir.
-MODELO_PADRAO = "intfloat/multilingual-e5-small"
-PREFIXO_PASSAGE = "passage: "
-PREFIXO_QUERY = "query: "
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Modelo e prefixos vem do runtime (src/config.py), nunca o contrario: o indice tem que ser
+# construido exatamente com o que o retriever vai usar na busca.
+from src.config import (  # noqa: E402
+    MODELO_EMBEDDING as MODELO_PADRAO,
+    PREFIXO_PASSAGE,
+    PREFIXO_QUERY,
+)
 
 
 def carregar_chunks(caminho: Path) -> list[dict]:
