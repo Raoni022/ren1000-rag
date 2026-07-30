@@ -141,11 +141,38 @@ Cada script é testável isoladamente. As funções de limpeza não dependem do 
 
 ```bash
 .venv/Scripts/python.exe tests/test_extract_text.py
+.venv/Scripts/python.exe tests/test_chunk_text.py
 ```
 
 ---
 
-## Requisito herdado para o Bloco 2: vigente ≠ revogado
+### 3. Dividir em chunks
+
+```bash
+.venv/Scripts/python.exe scripts/chunk_text.py --report
+.venv/Scripts/python.exe scripts/chunk_text.py --output index/chunks.json
+```
+
+Saída: **1.188 chunks** — 1.080 vigentes, 21 revogados, 87 de redação anterior. Mediana de 524
+caracteres, p99 de 1.194.
+
+**A unidade é o dispositivo com seus subordinados**, não o artigo nem o dispositivo isolado.
+Medido: por dispositivo a mediana é 146 caracteres, e `II - permitir a leitura` não significa
+nada fora do caput que o rege; por artigo inteiro, 52% passam de 500 caracteres e o Art. 2
+(definições) tem 20 mil, o que dilui o vetor a ponto de não ser recuperável. Então o caput
+entra com os incisos que dependem dele, cada parágrafo com os seus, e unidades do mesmo artigo
+são empacotadas até `--max-chars`. Quando uma unidade sozinha estoura o teto, ela é fatiada
+**repetindo o caput** em cada pedaço — nenhum inciso vai para o índice sem o texto que lhe dá
+sentido.
+
+Cada chunk tem dois campos de texto, de propósito: `texto` é o trecho literal, para exibir ao
+usuário conferir; `texto_busca` é o mesmo trecho precedido da trilha estrutural e do caput do
+artigo, e é o que o Bloco 3 vetoriza. Um `§ 2º O prazo é de 30 dias` só é recuperável por
+"prazo de análise de pedido de acesso" se o vetor souber de que artigo e capítulo ele veio.
+
+---
+
+## O problema central: nem todo texto da norma está em vigor
 
 O texto compilado da ANEEL **mantém visível o conteúdo de dispositivos já revogados**, marcado
 com `(Revogado pela REN ANEEL X)` — 66 ocorrências neste PDF. Exemplo real, do art. 655:
@@ -157,10 +184,39 @@ I - a partir de 1º de julho de 2019: 2.500 kW; (Revogado pela REN ANEEL 1.059, 
 Indexado sem distinção, o RAG recupera esse trecho e responde com **artigo correto e conteúdo
 que não vale mais** — falha que nenhum ajuste de prompt corrige, porque está na camada de dados.
 
-O `extract_text.py` preserva esses trechos de propósito: a função dele é ser uma transcrição
-fiel e auditável do documento oficial. A separação é tarefa do Bloco 2, onde cada chunk recebe
-metadado de vigência a partir da nota de alteração — que por isso é colada ao dispositivo que
-ela altera, nunca deixada como bloco órfão.
+### O caso pior: a redação anterior, que não tem marcador nenhum
+
+Quando uma resolução dá **nova redação** a um dispositivo, o texto compilado mostra as duas
+versões em sequência — e só a nova recebe marca. A antiga fica ali, indistinguível de texto
+vigente:
+
+```
+Art. 96. No caso de conexão de outra distribuidora [...] a distribuidora é
+         responsável por realizar o projeto [...]                              ← superada
+Art. 96. No caso de conexão de outra distribuidora [...] que não utilize o
+         processo simplificado da CCEE [...] (Redação dada pela REN ANEEL
+         1.110, de 10.12.2024)                                                 ← vigente
+```
+
+São **17 artigos e 87 chunks** nessa situação. É mais perigoso que o caso do revogado
+justamente por ser silencioso: não há nada no trecho antigo que denuncie o erro.
+
+A detecção é posicional e delimitada por hierarquia — o alcance de um dispositivo termina
+quando começa um irmão ou algo de nível superior. Contar rótulos ao longo do documento daria
+falso positivo, porque alíneas `a)` e `b)` se repetem legitimamente sob incisos diferentes (só
+no Art. 2 há uma dúzia de `a)` sem relação entre si). E as duas versões nem sempre são
+adjacentes: no Art. 144 a redação antiga vem acompanhada dos próprios incisos antes de a nova
+começar, e esses incisos também estão superados.
+
+### Como isso vira metadado
+
+Cada chunk carrega `situacao`: `vigente`, `revogado` ou `redacao_anterior` — e **nunca mistura
+as três no mesmo chunk**, senão a flag seria inútil. O `extract_text.py` preserva os trechos e
+as notas de alteração de propósito, para ser transcrição fiel e auditável; a separação acontece
+aqui, e a filtragem no retriever (Bloco 4).
+
+O `--report` avisa quando encontra um artigo duplicado cuja redação anterior não foi detectada
+— foi essa guarda que revelou o formato do Art. 144.
 
 Dois avisos do preâmbulo da norma que também precisam chegar ao usuário final (Bloco 5):
 o Despacho 2.006/2024 **suspendeu por decisão judicial** o prazo de 60 ciclos do inciso II do
@@ -173,9 +229,9 @@ art. 323, e a MP 1.300/2025 alterou a aplicação da tarifa social.
 | # | Bloco | Status |
 |---|---|---|
 | 1 | Extração e limpeza do PDF → `data/ren1000_raw.txt` | **concluído** — 679 artigos, sem buracos |
-| 2 | Chunking por artigo → `index/chunks.json` (+ metadado de vigência) | a fazer |
-| 3 | Embeddings + índice FAISS | a fazer |
-| 4 | Retriever (query → top-k) | a fazer |
+| 2 | Chunking por dispositivo → `index/chunks.json` (+ metadado de vigência) | **concluído** — 1.188 chunks, 0 blocos perdidos |
+| 3 | Embeddings + índice FAISS | a fazer — modelo precisa de janela ≥ 1.200 chars |
+| 4 | Retriever (query → top-k) | a fazer — filtrar por `situacao` |
 | 5 | Generator (prompt restrito + LLM) | a fazer |
 | 6 | Interface Gradio | a fazer |
 | 7 | Bateria de 10 perguntas de teste | a fazer |
@@ -183,6 +239,13 @@ art. 323, e a MP 1.300/2025 alterou a aplicação da tarifa social.
 | 9 | Deploy no Hugging Face Spaces | a fazer |
 
 Ideias fora do escopo da v1 ficam em [V2.md](V2.md).
+
+## Licença
+
+O código está sob [MIT](LICENSE). O texto da REN 1.000/2021 em `data/` e `index/` é ato
+normativo oficial da ANEEL, de domínio público nos termos do art. 8º da Lei 9.610/1998 — não
+é coberto pela licença deste repositório, e a fonte autoritativa continua sendo a publicação
+oficial da agência.
 
 ## Fonte
 
