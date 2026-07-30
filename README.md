@@ -170,6 +170,55 @@ usuário conferir; `texto_busca` é o mesmo trecho precedido da trilha estrutura
 artigo, e é o que o Bloco 3 vetoriza. Um `§ 2º O prazo é de 30 dias` só é recuperável por
 "prazo de análise de pedido de acesso" se o vetor souber de que artigo e capítulo ele veio.
 
+### 4. Gerar embeddings e o índice FAISS
+
+```bash
+.venv/Scripts/python.exe scripts/build_index.py
+```
+
+Saída: `index/ren1000.faiss`, 1.188 vetores de 384 dimensões, 1,7 MB. Leva ~3,5 min em CPU.
+
+**Modelo: `intfloat/multilingual-e5-small`.** O `paraphrase-multilingual-MiniLM-L12-v2` do
+plano original foi descartado por medição: janela de 128 tokens contra chunks de até 1.200
+caracteres. Com o e5-small (512 tokens), a medição real com o tokenizador do modelo dá mediana
+de 182 tokens, p99 de 427 e **apenas 1 chunk truncado** em 1.188.
+
+Dois detalhes que não geram erro quando errados, só degradam a busca em silêncio — e por isso
+estão em constantes compartilhadas com o retriever:
+
+- **Os prefixos do E5 não são opcionais.** O modelo é treinado com prefixo assimétrico:
+  documentos entram como `passage: ` e perguntas como `query: `. Omitir não quebra nada, só
+  piora a recuperação.
+- **`IndexFlatIP` sobre vetores normalizados em L2.** Com norma 1, o produto interno é
+  idêntico ao cosseno, que é a métrica para a qual o E5 foi treinado. `IndexFlatL2` daria
+  ordenação diferente e pior. O script falha explicitamente se a normalização não bater.
+
+`Flat` (força bruta, sem quantização) porque 1.188 vetores de 384 dimensões ocupam ~1,8 MB e a
+busca exata leva menos de um milissegundo. IVF ou HNSW só compensam em corpus ordens de
+grandeza maiores, e custariam recall.
+
+#### Dois achados que definem o Bloco 4 e o 5
+
+**A faixa de similaridade é estreita demais para servir de filtro.** Medido no índice pronto:
+
+| Pergunta | Score do top-1 |
+|---|---|
+| "Qual o prazo de análise do pedido de acesso?" | 0,878 |
+| "Qual o preço de um painel solar fotovoltaico?" (fora do escopo) | 0,844 |
+| "Qual a receita de bolo de cenoura?" | 0,824 |
+| `asdfgh qwerty zxcvb` | 0,809 |
+
+Sete centésimos separam uma pergunta legítima de teclado aleatório. **Não dá para implementar
+"não encontrei" com um limiar de score** — isso terá que ser responsabilidade do prompt do
+gerador (Bloco 5), que decide a partir do conteúdo dos trechos, não da nota da busca.
+
+**As definições do Art. 2 são mal recuperadas.** "Diferença entre micro e minigeração em
+potência" traz o alvo em rank 26; "geração compartilhada" em rank 47 — ambas fora do top-5, e
+ambas são perguntas da bateria de aceitação. A causa provável é o empacotamento: cada chunk do
+Art. 2 junta ~4 definições sem relação entre si sob um caput genérico, e o vetor vira a média
+delas. Medido: a definição isolada pontua +0,010 e +0,037 acima do chunk empacotado, o que
+nessa faixa comprimida é significativo. Ajuste a testar no Bloco 4/7.
+
 ---
 
 ## O problema central: nem todo texto da norma está em vigor
@@ -230,9 +279,9 @@ art. 323, e a MP 1.300/2025 alterou a aplicação da tarifa social.
 |---|---|---|
 | 1 | Extração e limpeza do PDF → `data/ren1000_raw.txt` | **concluído** — 679 artigos, sem buracos |
 | 2 | Chunking por dispositivo → `index/chunks.json` (+ metadado de vigência) | **concluído** — 1.188 chunks, 0 blocos perdidos |
-| 3 | Embeddings + índice FAISS | a fazer — modelo precisa de janela ≥ 1.200 chars |
-| 4 | Retriever (query → top-k) | a fazer — filtrar por `situacao` |
-| 5 | Generator (prompt restrito + LLM) | a fazer |
+| 3 | Embeddings + índice FAISS | **concluído** — e5-small, 1.188 vetores, 1 truncado |
+| 4 | Retriever (query → top-k) | a fazer — filtrar por `situacao`; rever chunk do Art. 2 |
+| 5 | Generator (prompt restrito + LLM) | a fazer — o "não encontrei" é aqui, não por limiar |
 | 6 | Interface Gradio | a fazer |
 | 7 | Bateria de 10 perguntas de teste | a fazer |
 | 8 | README final | a fazer |

@@ -8,6 +8,9 @@
 pdfplumber>=0.11
 
 # --- Build-time + runtime: busca semantica ---
+# Modelo: intfloat/multilingual-e5-small (janela de 512 tokens, 384 dims, ~470 MB).
+# O paraphrase-multilingual-MiniLM-L12-v2 do plano original foi descartado: janela de 128
+# tokens (~450 caracteres) contra chunks de ate 1.200 -- truncaria a maior parte do corpus.
 sentence-transformers>=3.0      # embeddings multilingues (roda local, sem API paga)
 faiss-cpu>=1.8                  # indice vetorial
 

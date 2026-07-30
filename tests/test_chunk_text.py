@@ -102,6 +102,14 @@ checar("secao nova mantem o capitulo", h2["capitulo"], "Capítulo II - DA CONEX�
 h3 = atualizar_hierarquia("Subseção I Do Prazo", h2)
 h4 = atualizar_hierarquia("Seção III Do Ponto de Conexão", h3)
 checar("secao nova invalida a subsecao anterior", "subsecao" in h4, False)
+checar(
+    "nota de alteracao sai do nome do capitulo (ela iria para todo chunk do capitulo)",
+    atualizar_hierarquia(
+        "CAPÍTULO XI DA MICROGERAÇÃO E MINIGERAÇÃO DISTRIBUÍDA (Incluído pela REN ANEEL "
+        "1.059, de 07.02.2023)", {}
+    )["capitulo"],
+    "Capítulo XI - DA MICROGERAÇÃO E MINIGERAÇÃO DISTRIBUÍDA",
+)
 
 print("\nnormas alteradoras")
 checar(

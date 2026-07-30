@@ -179,6 +179,29 @@ RE_NORMA_ALTERADORA = re.compile(
 )
 
 
+# Nota de alteracao grudada no nome de um cabecalho estrutural, ex.:
+# "CAPÍTULO XI DA MICROGERAÇÃO [...] (Incluído pela REN ANEEL 1.059, de 07.02.2023)".
+RE_NOTA_EM_TITULO = re.compile(
+    r"\s*\(\s*(?:Inclu[ií]d|Reda[çc][ãa]o\s+dada|Revogad|Renumerad)[^)]*\)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _limpar_titulo(nome: str) -> str:
+    """Tira a nota de alteracao do nome de um titulo/capitulo/secao.
+
+    A trilha entra no texto_busca de TODO chunk do capitulo, entao a nota seria repetida
+    centenas de vezes no indice: gasta janela do modelo de embedding e dilui o vetor com
+    tokens que nao tem a ver com o assunto do dispositivo. A informacao nao se perde -- a
+    procedencia de cada trecho continua no campo 'alteracoes'.
+    """
+    anterior = None
+    while anterior != nome:
+        anterior = nome
+        nome = RE_NOTA_EM_TITULO.sub("", nome).strip()
+    return nome
+
+
 def _normalizar_nivel(marcador: str) -> str:
     m = marcador.lower()
     if m.startswith("t"):
@@ -206,7 +229,7 @@ def atualizar_hierarquia(linha: str, hierarquia: dict[str, str]) -> dict[str, st
     for i, m in enumerate(marcas):
         nivel = _normalizar_nivel(m.group(1))
         fim = marcas[i + 1].start() if i + 1 < len(marcas) else len(linha)
-        nome = linha[m.end():fim].strip(" .:-")
+        nome = _limpar_titulo(linha[m.end():fim].strip(" .:-"))
         rotulo = f"{m.group(1).title()} {m.group(2)}"
         nova[nivel] = f"{rotulo} - {nome}" if nome else rotulo
         for outro, ordem in _ORDEM_NIVEL.items():
