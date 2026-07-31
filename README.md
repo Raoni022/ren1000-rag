@@ -144,10 +144,17 @@ Cada script é testável isoladamente. As funções de limpeza não dependem do 
 .venv/Scripts/python.exe tests/test_chunk_text.py
 .venv/Scripts/python.exe tests/test_build_index.py
 .venv/Scripts/python.exe tests/test_retriever.py
+.venv/Scripts/python.exe tests/test_generator.py
 ```
 
-Nenhum deles baixa o modelo de embedding: os testes do índice e da busca usam vetores
-conhecidos, para cobrir a lógica que erra em silêncio (filtro, ordenação, sincronia).
+Nenhum deles baixa o modelo de embedding nem chama a API do LLM: os testes do índice e da
+busca usam vetores conhecidos e o do gerador usa um dublê de cliente. Cobrem a lógica que erra
+em silêncio — filtro de vigência, ordenação, sincronia entre índice e chunks, e verificação de
+citação.
+
+O que **não** está coberto por teste automatizado é o comportamento do modelo real: se ele de
+fato respeita "responda só com os trechos" e devolve a frase de não-encontrado quando deve.
+Isso é a bateria de 10 perguntas do Bloco 7, que precisa de chave de API.
 
 ---
 
@@ -224,6 +231,38 @@ a devolver **o artigo errado para o vetor certo**, sem erro nenhum.
 Modelo e prefixos do E5 ficam em `src/config.py`, lido tanto pelo build quanto pela busca. A
 dependência aponta de `scripts/` para `src/`, nunca o contrário: o índice tem que ser
 construído com o que o runtime espera.
+
+### 6. Responder
+
+```bash
+cp .env.example .env    # preencha LLM_API_KEY
+.venv/Scripts/python.exe -m src.generator "prazo para analisar pedido de acesso"
+```
+
+Sem chave, `--dry-run` imprime o prompt montado sem chamar a API.
+
+**Qualquer provedor compatível com a API da OpenAI.** Groq, Gemini, DeepSeek e OpenRouter
+expõem a mesma interface de chat completions, então trocar de provedor é mudar `LLM_BASE_URL`
+e `LLM_MODEL` — não mexer no código. A escolha aqui é por preço, e preço de LLM muda mais
+rápido que código.
+
+#### A verificação de citação não é opcional
+
+O princípio do projeto é que a IA nunca invente número de artigo. O prompt instrui isso, mas
+instrução reduz o erro e não o elimina — e esse erro é especialmente danoso aqui, porque a
+resposta *parece* verificável justamente por citar artigo.
+
+Então, depois da geração, o código extrai toda citação `Art. N` da resposta e confere contra
+os artigos efetivamente recuperados. O que não bater vira aviso explícito em `Resposta.avisos`,
+para a interface mostrar. É determinístico e independe do modelo — inclusive de um modelo
+barato e fraco, que é justamente o caso de uso.
+
+Três avisos possíveis: `CITACAO_NAO_RECUPERADA` (citou artigo que não veio nos trechos),
+`SEM_CITACAO` (respondeu sem citar nada) e `RESSALVA` (o artigo citado tem efeito suspenso —
+hoje só o Art. 323, pelo Despacho ANEEL 2.006/2024).
+
+Quando o retriever não devolve trecho nenhum, a resposta é "não encontrei" direto, sem gastar
+chamada de API.
 
 #### Dois achados que definem o Bloco 4 e o 5
 
@@ -330,7 +369,7 @@ art. 323, e a MP 1.300/2025 alterou a aplicação da tarifa social.
 | 2 | Chunking por dispositivo → `index/chunks.json` (+ metadado de vigência) | **concluído** — 1.188 chunks, 0 blocos perdidos |
 | 3 | Embeddings + índice FAISS | **concluído** — e5-small, 1.188 vetores, 1 truncado |
 | 4 | Retriever (query → top-k) | **concluído** — filtra por `situacao`, sem limiar de score |
-| 5 | Generator (prompt restrito + LLM) | a fazer — o "não encontrei" é aqui, não por limiar |
+| 5 | Generator (prompt restrito + LLM) | **concluído** — falta validar com API real |
 | 6 | Interface Gradio | a fazer |
 | 7 | Bateria de 10 perguntas de teste | a fazer |
 | 8 | README final | a fazer |

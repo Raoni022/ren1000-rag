@@ -16,5 +16,10 @@ faiss-cpu>=1.8                  # indice vetorial
 
 # --- Runtime: app.py ---
 gradio>=5.0                     # interface
-google-generativeai>=0.8        # LLM apenas para formular a resposta (free tier)
-python-dotenv>=1.0              # carrega GEMINI_API_KEY em dev local
+
+# Cliente OpenAI-compatível, nao SDK de um provedor especifico. Groq, Gemini, DeepSeek e
+# OpenRouter expoem a mesma interface de chat completions, entao trocar de provedor e mudar
+# LLM_BASE_URL e LLM_MODEL -- nao mexer no codigo. A escolha aqui e por preco, e preco de LLM
+# muda mais rapido que codigo.
+openai>=1.50                    # LLM apenas para formular a resposta sobre os trechos
+python-dotenv>=1.0              # carrega LLM_API_KEY em dev local
