@@ -1,25 +1,29 @@
 # Python 3.11 (o venv local usa `py -3.11`; o HF Spaces roda 3.10/3.11).
 # NAO usar 3.14: torch/faiss-cpu ainda nao publicam wheel para essa versao.
+#
+# Os limites superiores nao sao excesso de zelo: o Gradio 6 moveu `theme` do construtor do
+# Blocks para o launch(), e uma faixa aberta faria o Space instalar uma versao com API
+# diferente da testada aqui. As versoes abaixo sao as efetivamente exercitadas pelos testes.
 
 # --- Build-time: scripts/ (rodados uma vez, offline, para construir o indice) ---
 # pdfplumber e nao pypdf: o pypdf insere espacos dentro das palavras neste PDF
 # ("identific acao"). Medicao e justificativa no docstring de scripts/extract_text.py.
 # Licenca MIT, como o pdfminer.six em que ele se apoia.
-pdfplumber>=0.11
+pdfplumber>=0.11,<0.12
 
 # --- Build-time + runtime: busca semantica ---
 # Modelo: intfloat/multilingual-e5-small (janela de 512 tokens, 384 dims, ~470 MB).
 # O paraphrase-multilingual-MiniLM-L12-v2 do plano original foi descartado: janela de 128
 # tokens (~450 caracteres) contra chunks de ate 1.200 -- truncaria a maior parte do corpus.
-sentence-transformers>=3.0      # embeddings multilingues (roda local, sem API paga)
-faiss-cpu>=1.8                  # indice vetorial
+sentence-transformers>=5.0,<6.0   # embeddings multilingues (roda local, sem API paga)
+faiss-cpu>=1.12,<2.0              # indice vetorial
 
 # --- Runtime: app.py ---
-gradio>=5.0                     # interface
+gradio>=6.0,<7.0                  # interface
 
 # Cliente OpenAI-compatível, nao SDK de um provedor especifico. Groq, Gemini, DeepSeek e
 # OpenRouter expoem a mesma interface de chat completions, entao trocar de provedor e mudar
 # LLM_BASE_URL e LLM_MODEL -- nao mexer no codigo. A escolha aqui e por preco, e preco de LLM
 # muda mais rapido que codigo.
-openai>=1.50                    # LLM apenas para formular a resposta sobre os trechos
-python-dotenv>=1.0              # carrega LLM_API_KEY em dev local
+openai>=2.0,<3.0                  # LLM apenas para formular a resposta sobre os trechos
+python-dotenv>=1.0,<2.0           # carrega LLM_API_KEY em dev local

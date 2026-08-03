@@ -145,6 +145,7 @@ Cada script é testável isoladamente. As funções de limpeza não dependem do 
 .venv/Scripts/python.exe tests/test_build_index.py
 .venv/Scripts/python.exe tests/test_retriever.py
 .venv/Scripts/python.exe tests/test_generator.py
+.venv/Scripts/python.exe tests/test_app.py
 ```
 
 Nenhum deles baixa o modelo de embedding nem chama a API do LLM: os testes do índice e da
@@ -264,6 +265,34 @@ hoje só o Art. 323, pelo Despacho ANEEL 2.006/2024).
 Quando o retriever não devolve trecho nenhum, a resposta é "não encontrei" direto, sem gastar
 chamada de API.
 
+### 7. Rodar a interface
+
+```bash
+.venv/Scripts/python.exe app.py
+```
+
+Interface Gradio em `http://localhost:7860`: caixa de pergunta, resposta citando o artigo, e os
+trechos originais em blockquote logo abaixo, com trilha estrutural, similaridade e procedência
+da alteração. O disclaimer fica na própria interface, não só neste README.
+
+**Sem `LLM_API_KEY` o app não quebra** — degrada para busca pura, exibindo os trechos
+recuperados sem o parágrafo redigido. A parte de busca não depende de API paga nenhuma, e isso
+evita que o Space publicado fique inutilizável se a chave expirar ou estourar a cota do free
+tier. Falha de API também não derruba a interface: vira aviso, e os trechos continuam sendo
+entregues.
+
+O checkbox "incluir revogados e redações anteriores" existe para inspeção, e mostrar o que ele
+revela é a melhor justificativa do Bloco 2 que este projeto tem:
+
+```
+1. Art. 96 · ⚠️ REDAÇÃO ANTERIOR · similaridade 0.920
+```
+
+Para a pergunta sobre projeto e montagem do sistema de medição, a **redação superada do
+Art. 96 é o melhor casamento semântico do corpus inteiro** — 0,920, o score mais alto medido
+neste projeto. Com o filtro padrão ela nunca é recuperada. Sem o metadado de vigência, o
+sistema responderia com o texto revogado desse artigo, com a maior confiança possível.
+
 #### Dois achados que definem o Bloco 4 e o 5
 
 **A faixa de similaridade é estreita demais para servir de filtro.** Medido no índice pronto:
@@ -370,7 +399,7 @@ art. 323, e a MP 1.300/2025 alterou a aplicação da tarifa social.
 | 3 | Embeddings + índice FAISS | **concluído** — e5-small, 1.188 vetores, 1 truncado |
 | 4 | Retriever (query → top-k) | **concluído** — filtra por `situacao`, sem limiar de score |
 | 5 | Generator (prompt restrito + LLM) | **concluído** — falta validar com API real |
-| 6 | Interface Gradio | a fazer |
+| 6 | Interface Gradio | **concluído** — degrada para busca sem chave |
 | 7 | Bateria de 10 perguntas de teste | a fazer |
 | 8 | README final | a fazer |
 | 9 | Deploy no Hugging Face Spaces | a fazer |

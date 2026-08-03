@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 .env
 
+# Configuracao local de ferramenta, nao faz parte do projeto.
+.claude/
+
 # PDF oficial da ANEEL: baixado localmente, nao versionado.
 # O que vai para o repositorio e o texto extraido (data/ren1000_raw.txt),
 # que e diffavel e serve de fonte auditavel para o chunking.
