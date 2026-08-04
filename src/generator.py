@@ -88,12 +88,21 @@ sobre a ANEEL ou sobre qualquer outra norma.
 2. Cite o número do artigo de onde vem cada afirmação, no formato "Art. 15" ou "Art. 655-C".
 3. Cite APENAS artigos que aparecem nos trechos. Nunca escreva um número de artigo que não \
 esteja explicitamente listado abaixo.
-4. Se os trechos não contiverem a informação pedida, responda exatamente com esta frase, \
+4. A norma usa vocabulário técnico próprio, que quase nunca é o mesmo de quem pergunta. \
+O que o público chama de "pedido de acesso" ou "protocolo de acesso", a norma chama de \
+"orçamento de conexão"; "conta de luz" é "fatura"; "corte" é "suspensão do fornecimento". \
+Julgue pelo ASSUNTO do trecho, não pela coincidência de palavras: se um trecho trata do que \
+foi perguntado usando outra terminologia, ele responde a pergunta — use-o.
+5. Recuse (item 6) em dois casos, e somente neles: (a) nenhum trecho trata do assunto \
+perguntado; ou (b) a pergunta é vaga, incompleta ou ambígua demais para identificar o que \
+está sendo perguntado — nesse caso recuse mesmo que algum trecho pareça vagamente \
+relacionado. Terminologia diferente da sua NÃO é motivo para recusar.
+6. Se os trechos não contiverem a informação pedida, responda exatamente com esta frase, \
 sem acrescentar nada:
 {frase_sem_resposta}
-5. Responda em português do Brasil, em no máximo 6 linhas, de forma direta. Não repita a \
+7. Responda em português do Brasil, em no máximo 6 linhas, de forma direta. Não repita a \
 pergunta nem descreva o que você vai fazer.
-6. Se os trechos trouxerem números, prazos ou limites, transcreva-os exatamente como estão."""
+8. Se os trechos trouxerem números, prazos ou limites, transcreva-os exatamente como estão."""
 
 
 @dataclass

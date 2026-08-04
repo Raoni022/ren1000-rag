@@ -81,6 +81,16 @@ resposta, avisos, fontes = app.responder("   ", 5, False)
 checar("resposta vazia", resposta, "")
 checar("orienta o usuário", "Digite uma pergunta" in fontes, True)
 
+print("\nfalha da API é traduzida para linguagem de usuário")
+checar("estouro de cota não vira traceback",
+       "cota diária" in app._explicar_falha(RuntimeError(
+           "Error code: 429 - rate_limit_exceeded: tokens per day (TPD)")), True)
+checar("chave inválida é identificada",
+       "Chave de API inválida" in app._explicar_falha(RuntimeError(
+           "Error code: 401 - {'code': 'invalid_api_key'}")), True)
+checar("falha desconhecida mostra o erro original",
+       "coisa estranha" in app._explicar_falha(RuntimeError("coisa estranha")), True)
+
 print("\nfalha do LLM não derruba a interface")
 class GeneratorQuebrado:
     def responder(self, *a, **kw):
@@ -91,7 +101,8 @@ app.generator, app.tem_chave = GeneratorQuebrado(), True
 try:
     # Retriever real, com o índice do repositório: exercita o caminho completo até o gerador.
     resposta, avisos, fontes = app.responder("prazo de analise do pedido de acesso", 2, False)
-    checar("avisa sobre a falha", "Falha ao chamar o modelo" in avisos, True)
+    checar("avisa sobre a falha", "cota estourada" in avisos, True)
+    checar("explica que a busca continua funcionando", "busca continua" in avisos, True)
     checar("mas ainda entrega os trechos recuperados", "**1. Art." in fontes, True)
 finally:
     app.generator, app.tem_chave = original_gen, original_chave

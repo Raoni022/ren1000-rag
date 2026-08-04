@@ -57,10 +57,22 @@ from src.config import (  # noqa: E402
     PREFIXO_QUERY,
     SITUACAO_VIGENTE,
 )
+from src.glossario import expandir  # noqa: E402
 
 # Quantos candidatos buscar por resultado pedido, antes de filtrar por vigencia. Como so 9% do
-# indice esta fora de vigor, 4x cobre com folga; se ainda faltar, buscar_com_folga() amplia.
+# indice esta fora de vigor, 4x cobre com folga; se ainda faltar, a busca amplia sozinha.
 FATOR_FOLGA = 4
+
+# Medido na bateria de aceitacao (scripts/avaliar.py), com o glossario ligado -- recall do
+# artigo do gabarito entre os 7 casos que tem gabarito:
+#
+#     k=3  3/7      k=8  6/7      k=15  7/7
+#     k=5  4/7      k=10 6/7      k=20  7/7
+#
+# 8 e o ponto onde a curva achata: de 5 para 8 ganha dois casos, de 8 para 15 ganha um. O custo
+# e desprezivel -- 8 trechos de ~600 caracteres dao ~1.200 tokens de contexto --, e passar de
+# 8 comeca a encher a interface de texto que o usuario nao vai ler.
+K_PADRAO = 8
 
 
 @dataclass(frozen=True)
@@ -93,10 +105,13 @@ class Retriever:
         caminho_chunks: Path = CAMINHO_CHUNKS,
         caminho_indice: Path = CAMINHO_INDICE,
         modelo: str = MODELO_EMBEDDING,
+        expandir_consulta: bool = True,
     ) -> None:
         self.caminho_chunks = Path(caminho_chunks)
         self.caminho_indice = Path(caminho_indice)
         self.nome_modelo = modelo
+        # Desligavel para medir o efeito do glossario -- ver scripts/avaliar.py --sem-glossario.
+        self.expandir_consulta = expandir_consulta
 
     # -- carregamento preguicoso -------------------------------------------------------
 
@@ -142,10 +157,16 @@ class Retriever:
             [PREFIXO_QUERY + pergunta], normalize_embeddings=True
         ).astype("float32")
 
+    def preparar_consulta(self, pergunta: str) -> tuple[str, list[str]]:
+        """Aplica o glossario, se ligado. Devolve (consulta, termos acrescentados)."""
+        if not self.expandir_consulta:
+            return pergunta, []
+        return expandir(pergunta)
+
     def buscar(
         self,
         pergunta: str,
-        k: int = 5,
+        k: int = K_PADRAO,
         situacoes: tuple[str, ...] = (SITUACAO_VIGENTE,),
     ) -> list[Resultado]:
         """Devolve os k trechos mais proximos cuja situacao esteja em `situacoes`.
@@ -157,7 +178,8 @@ class Retriever:
         if not pergunta:
             return []
 
-        vetor = self._vetorizar(pergunta)
+        consulta, _ = self.preparar_consulta(pergunta)
+        vetor = self._vetorizar(consulta)
         limite = self.indice.ntotal
         buscar_n = min(limite, max(k * FATOR_FOLGA, k))
 
@@ -196,7 +218,7 @@ class Retriever:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Busca trechos da REN 1.000/2021.")
     parser.add_argument("pergunta", help="Pergunta em linguagem natural.")
-    parser.add_argument("-k", type=int, default=5, help="Quantos trechos devolver.")
+    parser.add_argument("-k", type=int, default=K_PADRAO, help="Quantos trechos devolver.")
     parser.add_argument(
         "--todas-situacoes",
         action="store_true",

@@ -10,8 +10,9 @@ Você pergunta em linguagem natural; o sistema recupera os trechos relevantes da
 formula uma resposta curta **citando o número do artigo**, com o texto original visível ao
 lado para conferência.
 
-> **Status: em construção (Bloco 1 de 9 concluído).** Ainda não há demo pública. Este README
-> descreve o que já roda e o que falta.
+> **Status: blocos 1 a 7 de 9 concluídos.** O sistema roda ponta a ponta e passa na bateria de
+> aceitação com **8/10 e zero citações inventadas** ([relatório](docs/AVALIACAO.md)). Falta o
+> deploy público.
 
 O corpus é o **texto compilado** da norma: 152 páginas, **679 artigos** (Art. 1 ao Art. 679),
 já com as alterações das REN 1.059/2023, 1.081/2023, 1.095/2024 e 1.098/2024 marcadas inline.
@@ -50,9 +51,10 @@ pergunta -> src/retriever.py (top-k no FAISS) -> src/generator.py (LLM sobre os 
          -> app.py (resposta + trecho-fonte)
 ```
 
-**Stack:** Python 3.11 · `sentence-transformers`
-(`paraphrase-multilingual-MiniLM-L12-v2`, roda local, sem API paga na busca) · `faiss-cpu` ·
-`gradio` · Gemini/Groq free tier apenas para redigir a resposta final · Hugging Face Spaces.
+**Stack:** Python 3.11 · `pdfplumber` · `sentence-transformers` com
+`intfloat/multilingual-e5-small` (roda local, sem API paga na busca) · `faiss-cpu` · `gradio` ·
+qualquer LLM com API compatível com a da OpenAI, só para redigir a resposta final ·
+Hugging Face Spaces.
 
 O corpus é uma norma única e estática, então FAISS local basta — não há motivo para banco
 vetorial gerenciado aqui.
@@ -145,6 +147,7 @@ Cada script é testável isoladamente. As funções de limpeza não dependem do 
 .venv/Scripts/python.exe tests/test_build_index.py
 .venv/Scripts/python.exe tests/test_retriever.py
 .venv/Scripts/python.exe tests/test_generator.py
+.venv/Scripts/python.exe tests/test_glossario.py
 .venv/Scripts/python.exe tests/test_app.py
 ```
 
@@ -293,6 +296,81 @@ Art. 96 é o melhor casamento semântico do corpus inteiro** — 0,920, o score 
 neste projeto. Com o filtro padrão ela nunca é recuperada. Sem o metadado de vigência, o
 sistema responderia com o texto revogado desse artigo, com a maior confiança possível.
 
+### 8. Avaliar
+
+```bash
+.venv/Scripts/python.exe scripts/avaliar.py --so-busca   # sem LLM, sem custo
+.venv/Scripts/python.exe scripts/avaliar.py --output docs/AVALIACAO.md
+```
+
+Resultado atual: **8/10, aprovado**, com **zero citações inventadas**. Relatório completo em
+[docs/AVALIACAO.md](docs/AVALIACAO.md); gabarito verificado dispositivo por dispositivo em
+[tests/perguntas_aceitacao.py](tests/perguntas_aceitacao.py).
+
+#### O achado que reorganizou o projeto: a norma não fala a língua de quem pergunta
+
+Contagem no corpus vigente:
+
+| Como se pergunta | ocorrências | Como a norma escreve | ocorrências |
+|---|---|---|---|
+| `pedido de acesso` | **0** | `orçamento de conexão` | 82 |
+| `conta de luz` | **0** | `fatura` | 582 |
+| `corte de energia` | **0** | `suspensão do fornecimento` | 28 |
+| `troca de titularidade` | **0** | `alteração de titularidade` | 25 |
+| `placa solar` | **0** | `microgeração distribuída` | 18 |
+
+O caso do "pedido de acesso" é o mais instrutivo: esse vocabulário vem da REN 482/2012 e do
+PRODIST, revogados pela REN 1.059/2023. Quem aprendeu a profissão antes de 2023 pergunta assim
+— e a resposta existe, no Art. 64, sob outro nome.
+
+**Busca vetorial não resolve isso sozinha**, porque os termos não são sinônimos linguísticos e
+sim uma troca de nomenclatura por decisão regulatória. **Busca léxica (BM25) também não**, pelo
+motivo oposto: não se acha por casamento de termo o que não está escrito. A solução foi
+[src/glossario.py](src/glossario.py), uma tabela curta e auditável que **acrescenta** o termo da
+norma à pergunta, sem substituir — preservando o resto do que foi perguntado.
+
+A opção de reescrever as perguntas no vocabulário da norma foi descartada: faria a métrica subir
+sem o produto melhorar, e o público-alvo continuaria sem resposta.
+
+#### Como o resultado evoluiu, medido a cada passo
+
+| Mudança | Recuperação | Aceitação |
+|---|---|---|
+| baseline (k=5) | 3/7 | 6/10 |
+| + glossário | 4/7 | — |
+| + `k=8` | 6/7 | 7/10 |
+| + prompt ciente da diferença de vocabulário | 6/7 | 7/10 (quebrou a 10) |
+| + recusa explícita para pergunta vaga | 6/7 | **8/10** |
+
+O `k=8` não é ajuste ao gabarito: o recall medido é 3/7 em k=3, 4/7 em k=5, 6/7 em k=8 e 7/7
+só em k=15. Oito é onde a curva achata.
+
+O quarto passo é o mais instrutivo: avisar o modelo sobre a diferença de vocabulário consertou
+a pergunta 6 e **quebrou a 10** — ele passou a responder "e a conta?" citando um artigo qualquer
+em vez de recusar. Afrouxar a recusa custou a recusa. O conserto foi separar os dois motivos
+legítimos de recusar: nenhum trecho trata do assunto, **ou** a pergunta é vaga demais para se
+saber o que foi perguntado.
+
+#### As duas falhas que sobraram
+
+**Pergunta 1** — o `Art. 64` é recuperado, mas na posição 8, e o modelo prefere o `Art. 90`,
+que trata do caso especial da Lei 14.195 (45 dias) em vez da regra geral (15 e 30 dias). A
+citação é honesta e o artigo existe, mas o usuário sairia mal informado. Conta como falha.
+
+**Pergunta 2** — a definição de micro e minigeração do `Art. 2` fica em rank 12, fora do
+top-8. É a mesma limitação de ranking das definições já documentada no Bloco 3, e é o caso onde
+busca híbrida ainda pode ajudar, porque aqui os termos existem literalmente no corpus.
+
+#### Limite de cota do free tier
+
+Cada pergunta consome ~2,5 mil tokens com `k=8`. O free tier da Groq dá **100 mil tokens por
+dia** para o `llama-3.3-70b-versatile` — ou seja, **algumas dezenas de perguntas por dia** num
+Space público. Ao estourar, o app avisa em português que a cota acabou e continua entregando os
+trechos da norma, em vez de mostrar o erro cru.
+
+Por isso o resultado 8/10 é de **uma medição única**: a cota do dia acabou durante a avaliação e
+não deu para repetir a bateria para conferir estabilidade.
+
 #### Dois achados que definem o Bloco 4 e o 5
 
 **A faixa de similaridade é estreita demais para servir de filtro.** Medido no índice pronto:
@@ -400,7 +478,7 @@ art. 323, e a MP 1.300/2025 alterou a aplicação da tarifa social.
 | 4 | Retriever (query → top-k) | **concluído** — filtra por `situacao`, sem limiar de score |
 | 5 | Generator (prompt restrito + LLM) | **concluído** — falta validar com API real |
 | 6 | Interface Gradio | **concluído** — degrada para busca sem chave |
-| 7 | Bateria de 10 perguntas de teste | a fazer |
+| 7 | Bateria de 10 perguntas de teste | **concluído** — 8/10, 0 alucinações |
 | 8 | README final | a fazer |
 | 9 | Deploy no Hugging Face Spaces | a fazer |
 

@@ -82,6 +82,31 @@ def formatar_fontes(trechos) -> str:
     return "\n\n---\n\n".join(partes)
 
 
+_AVISO_SO_BUSCA = (
+    "A busca continua funcionando: os trechos da norma abaixo são o resultado da recuperação."
+)
+
+
+def _explicar_falha(erro: Exception) -> str:
+    """Traduz a falha da API para algo que o usuário do Space consiga entender.
+
+    O estouro de cota é o caso esperado, não o excepcional: o free tier da Groq dá 100 mil
+    tokens por dia para o llama-3.3-70b, e cada pergunta consome ~2,5 mil com k=8. Algumas
+    dezenas de perguntas zeram a cota diária de um Space público, e mostrar o traceback bruto
+    faria parecer que a ferramenta quebrou, quando ela apenas ficou sem orçamento até o dia
+    seguinte.
+    """
+    texto = str(erro)
+    if "rate_limit" in texto or "429" in texto:
+        return (
+            "⏳ A cota diária do modelo de linguagem acabou, então a resposta redigida está "
+            "indisponível até a cota renovar."
+        )
+    if "invalid_api_key" in texto or "401" in texto:
+        return "⚠️ Chave de API inválida ou de provedor diferente do configurado."
+    return f"⚠️ Falha ao chamar o modelo de linguagem: {erro}"
+
+
 def formatar_avisos(avisos: list[str]) -> str:
     if not avisos:
         return ""
@@ -108,7 +133,7 @@ def responder(pergunta: str, k: int, incluir_nao_vigentes: bool):
     try:
         resposta = generator.responder(pergunta, trechos)
     except Exception as erro:  # a interface nao pode cair por falha de API
-        return "", f"⚠️ Falha ao chamar o modelo de linguagem: {erro}", fontes
+        return "", f"{_explicar_falha(erro)}\n\n{_AVISO_SO_BUSCA}", fontes
 
     texto = resposta.texto or FRASE_SEM_RESPOSTA
     if resposta.artigos_citados:
