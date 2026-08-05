@@ -1,3 +1,15 @@
+---
+title: Busca na REN ANEEL 1.000/2021
+emoji: ⚡
+colorFrom: blue
+colorTo: green
+sdk: gradio
+sdk_version: 6.22.0
+app_file: app.py
+pinned: false
+license: mit
+---
+
 # Busca semântica na REN ANEEL 1.000/2021
 
 Pergunte em português sobre a norma que rege a distribuição de energia elétrica no Brasil —
@@ -175,14 +187,17 @@ Bateria de 10 perguntas com gabarito verificado dispositivo por dispositivo
 **recuperação** (o artigo certo está entre os `k` trechos?) e **aceitação** (a resposta cita o
 artigo certo, ou recusa quando deve?).
 
-Resultado: **7/7 na recuperação** e **8/10 na aceitação, com 0 citações inventadas**
-([relatório](docs/AVALIACAO.md)).
+**Recuperação: 7/7.** Métrica gratuita, medida com a busca híbrida em vigor.
 
-Uma ressalva de honestidade: o 8/10 foi medido duas vezes, com as mesmas duas falhas, **antes**
-da busca híbrida. A híbrida elevou a recuperação de 6/7 para 7/7 e fez subir o ranking das duas
-perguntas que falhavam — mas recuperar o artigo certo é condição necessária, não suficiente, e a
-cota diária do free tier acabou antes de refazer a bateria completa. O placar em
-`docs/AVALIACAO.md` é o da última execução completa, com busca só semântica.
+**Aceitação: 8/10 na última execução completa**, com 0 citações inventadas — medida duas vezes,
+com as mesmas duas falhas, então não é resultado de uma execução isolada. Só que essas duas
+execuções são **anteriores** à busca híbrida.
+
+Depois da híbrida deu para medir 7 das 10 perguntas antes de a cota diária do free tier acabar:
+**6 das 7 corretas**, e a pergunta 2 — que antes respondia errado citando o Art. 655-C — passou a
+citar o Art. 2 corretamente. As 3 restantes ficaram sem medir. O
+[relatório](docs/AVALIACAO.md) sai marcado como `PARCIAL` justamente para esse placar não ser
+lido como completo.
 
 ## Testes
 
@@ -237,7 +252,23 @@ O registro completo do que foi medido, decidido e **descartado** está em
 | 6 | Interface Gradio | **concluído** — degrada para busca sem chave |
 | 7 | Bateria de aceitação | **concluído** — 8/10, 0 alucinações |
 | 8 | README | **concluído** |
-| 9 | Deploy no Hugging Face Spaces | a fazer |
+| 9 | Deploy no Hugging Face Spaces | a fazer — falta criar o Space e configurar os secrets |
+
+### Publicar no Hugging Face Spaces
+
+O frontmatter no topo deste README já é a configuração do Space. Falta:
+
+1. Criar o Space em [huggingface.co/new-space](https://huggingface.co/new-space), SDK Gradio.
+2. Definir três **secrets** do Space (nunca no repositório): `LLM_API_KEY`, `LLM_BASE_URL`,
+   `LLM_MODEL`.
+3. `git push` deste repositório para o remoto do Space.
+
+O índice já vai versionado (`index/`, 3,8 MB), então o Space não recalcula nada — só baixa o
+modelo de embedding (~470 MB) na primeira execução.
+
+**Sobre a cota:** cada pergunta consome ~2,5 mil tokens e o free tier da Groq dá 100 mil por
+dia, ou seja, algumas dezenas de perguntas diárias. Ao esgotar, o app avisa em português e
+continua funcionando como busca, em vez de quebrar.
 
 Ideias fora do escopo da v1 ficam em [V2.md](V2.md).
 
