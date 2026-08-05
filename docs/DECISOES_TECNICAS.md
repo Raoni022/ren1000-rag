@@ -237,7 +237,55 @@ métrica subir sem o produto melhorar, e o público-alvo continuaria sem respost
 
 ---
 
-## 8. A verificação de citação não é opcional
+## 8. Busca híbrida: a única mudança que entrou por já ter régua
+
+As definições do Art. 2 continuavam fora do top-8 depois do glossário — e a consequência não
+era o sistema calar, era ele **responder errado com citação válida**:
+
+> *Art. 655-C. A minigeração distribuída tem potência instalada superior a 500 kW.*
+
+Os 500 kW do Art. 655-C são o gatilho da garantia de fiel cumprimento, não a fronteira entre
+micro e minigeração (75 kW). A citação existia e tinha sido recuperada, então o verificador
+determinístico não tinha como pegar — é o pior defeito que este sistema pode ter.
+
+A causa era a definição do Art. 2 nunca chegar ao contexto. Medido, com `k=8`:
+
+| # | Pergunta | densa | híbrida |
+|---|---|---|---|
+| 1 | prazo de análise do acesso | pos 8 | **pos 5** |
+| 2 | micro × minigeração em potência | **fora** | **pos 8** |
+| 3 | validade dos créditos | pos 4 | **pos 1** |
+| 4 | responsável técnico | pos 1 | pos 1 |
+| 6 | documentos do acesso | pos 2 | pos 2 |
+| 7 | prazo dos créditos | pos 2 | pos 2 |
+| 8 | geração compartilhada | pos 6 | **pos 2** |
+| | **recuperação** | **6/7** | **7/7** |
+
+Nenhuma pergunta piorou. Por isso entrou — e só por isso: era a terceira tentativa de consertar
+o Art. 2, depois de duas medições que refutaram hipóteses (fragmentar os chunks, seção 6; e o
+próprio glossário, que resolveu 1 e 6 mas não 2).
+
+**As duas buscas falham por motivos opostos e complementares.** A densa perde o termo técnico
+exato quando ele concorre com dezenas de artigos sobre o mesmo tema; a léxica não acha o que foi
+perguntado com outras palavras. O glossário cobre um terceiro caso, que nenhuma das duas cobre:
+quando o termo perguntado não existe no corpus.
+
+A fusão é **Reciprocal Rank Fusion**, não soma ponderada de scores. As duas escalas não são
+comparáveis — a similaridade densa vive espremida entre 0,80 e 0,92 (seção 5), enquanto o BM25 é
+ilimitado e depende da raridade dos termos. Normalizá-las exigiria calibração, e calibrar contra
+a bateria de aceitação seria ajustar o sistema ao próprio gabarito. O RRF ignora magnitude e usa
+só a ordem, que é o que as duas têm de comparável. O `k0 = 60` é o valor da publicação original
+e não foi ajustado.
+
+A tokenização léxica remove acento: quem digita "minigeracao" precisa casar com "minigeração", e
+o BM25 compara token com token, sem a tolerância do modelo de embedding.
+
+O score exibido continua sendo a similaridade semântica — é a única das duas escalas que
+significa algo para quem lê. A posição na lista é que reflete a fusão.
+
+---
+
+## 9. A verificação de citação não é opcional
 
 O princípio do projeto é que a IA nunca invente número de artigo. O prompt instrui isso, mas
 instrução reduz o erro e não o elimina — e esse erro é especialmente danoso aqui, porque a
@@ -253,7 +301,7 @@ hoje só o Art. 323, pelo Despacho ANEEL 2.006/2024).
 
 ---
 
-## 9. Como o resultado da bateria evoluiu
+## 10. Como o resultado da bateria evoluiu
 
 | Mudança | Recuperação | Aceitação |
 |---|---|---|
@@ -262,6 +310,11 @@ hoje só o Art. 323, pelo Despacho ANEEL 2.006/2024).
 | + `k=8` | 6/7 | 7/10 |
 | + prompt ciente da diferença de vocabulário | 6/7 | 7/10 (quebrou a 10) |
 | + recusa explícita para pergunta vaga | 6/7 | **8/10** |
+| + busca híbrida (BM25 + RRF) | **7/7** | pendente de cota |
+
+O 8/10 foi medido duas vezes, com as mesmas duas falhas — não é resultado de uma execução
+isolada. A última linha é a única em que a métrica de aceitação não pôde ser refeita: a cota
+diária do free tier acabou. A recuperação, que não custa chamada de API, foi medida.
 
 O `k=8` não é ajuste ao gabarito: o recall medido é 3/7 em k=3, 4/7 em k=5, 6/7 em k=8 e 7/7 só
 em k=15. Oito é onde a curva achata, a ~1.200 tokens de contexto.
@@ -272,20 +325,25 @@ em vez de recusar. Afrouxar a recusa custou a recusa. O conserto foi separar os 
 legítimos de recusar: nenhum trecho trata do assunto, **ou** a pergunta é vaga demais para se
 saber o que foi perguntado.
 
-### As duas falhas que sobraram
+### As duas falhas do último placar completo
 
-**Pergunta 1** — o `Art. 64` é recuperado, mas em oitavo, e o modelo prefere o `Art. 90`, que
-trata do caso especial da Lei 14.195 (45 dias) em vez da regra geral (15 e 30 dias). A citação é
-honesta e o artigo existe, mas o usuário sairia mal informado. Conta como falha, e o gabarito
-**não** foi ampliado para acomodar.
+Ambas foram medidas **antes** da busca híbrida, e as duas causas eram de ranking:
 
-**Pergunta 2** — a definição de micro e minigeração do `Art. 2` fica em rank 12, fora do top-8.
-É o caso onde busca híbrida ainda pode ajudar, porque ali os termos existem literalmente no
-corpus. Fica para a v2.
+**Pergunta 1** — o `Art. 64` era recuperado só em oitavo, e o modelo preferia o `Art. 90`, que
+trata do caso especial da Lei 14.195 (45 dias) em vez da regra geral (15 e 30 dias). A citação
+era honesta e o artigo existe, mas o usuário sairia mal informado. Contou como falha, e o
+gabarito **não** foi ampliado para acomodar. Com a híbrida o Art. 64 subiu para o quinto lugar.
+
+**Pergunta 2** — a definição do `Art. 2` ficava fora do top-8. Com a híbrida ela entrou, em
+oitavo. Foi essa pergunta que produziu a resposta errada da seção 8.
+
+Em nenhum dos dois casos dá para afirmar que a aceitação subiu: recuperar o artigo certo é
+condição necessária, não suficiente — o modelo ainda precisa escolher o trecho certo entre os
+oito. Isso só se sabe refazendo a bateria completa.
 
 ---
 
-## 10. Limite de cota do free tier
+## 11. Limite de cota do free tier
 
 Cada pergunta consome ~2,5 mil tokens com `k=8`. O free tier da Groq dá **100 mil tokens por
 dia** para o `llama-3.3-70b-versatile` — ou seja, **algumas dezenas de perguntas por dia** num
@@ -295,4 +353,6 @@ Ao estourar, o app avisa em português que a cota acabou e continua entregando o
 norma, em vez de mostrar o erro cru. Sem chave nenhuma, ele degrada para busca pura: a
 recuperação não depende de API paga.
 
-Foi esse limite que impediu repetir a bateria — o **8/10 é de uma medição única**.
+O avaliador trata esse estouro por pergunta, não por execução: uma bateria interrompida no meio
+sai como relatório **parcial**, com as perguntas já medidas preservadas e um aviso no cabeçalho.
+Derrubar tudo perderia o trabalho já pago em tokens.

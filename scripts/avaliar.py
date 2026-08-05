@@ -61,7 +61,17 @@ def avaliar_resposta(linhas: list[dict], k: int, retriever: Retriever) -> list[d
     gerador = Generator()
     for linha in linhas:
         trechos = retriever.buscar(linha["pergunta"], k=k)
-        resposta = gerador.responder(linha["pergunta"], trechos)
+
+        # Estourar a cota no meio da bateria e o caso comum no free tier: 10 perguntas custam
+        # ~25 mil tokens e o limite diario e 100 mil. Derrubar tudo perderia as perguntas ja
+        # avaliadas, entao a falha e registrada por pergunta e o relatorio sai parcial e
+        # honesto -- com a ressalva no cabecalho, para ninguem ler o placar como completo.
+        try:
+            resposta = gerador.responder(linha["pergunta"], trechos)
+        except Exception as erro:
+            linha.update(texto=f"(não avaliada: {erro})", citados=[], recusou=False,
+                         confiavel=True, avisos=[], ok_resposta=None)
+            continue
 
         if linha["esperado"] is RECUSA:
             ok = resposta.sem_resposta
@@ -93,10 +103,17 @@ def render(linhas: list[dict], k: int, completo: bool) -> str:
 
     if completo:
         acertos = sum(1 for l in linhas if l["ok_resposta"])
+        nao_avaliadas = [l for l in linhas if l.get("ok_resposta") is None]
         veredito = "APROVADO" if acertos >= CRITERIO_APROVACAO else "REPROVADO"
         alucinacoes = sum(1 for l in linhas if not l.get("confiavel", True))
+        if nao_avaliadas:
+            veredito = "PARCIAL"
         out.append(f"**Aceitação:** {acertos}/{len(PERGUNTAS)} — **{veredito}**")
         out.append(f"**Citações inventadas:** {alucinacoes}")
+        if nao_avaliadas:
+            ids = ", ".join(str(l["id"]) for l in nao_avaliadas)
+            out.append(f"> ⚠️ {len(nao_avaliadas)} pergunta(s) não avaliada(s) por falha de "
+                       f"API ({ids}). O placar acima está incompleto.")
     out.append("")
 
     cabecalho = "| # | Pergunta | Esperado | Busca | " + ("Resposta | Citou |" if completo else "")
@@ -108,7 +125,8 @@ def render(linhas: list[dict], k: int, completo: bool) -> str:
                                                    else "✗ fora do top-k")
         linha = f"| {l['id']} | {l['pergunta'][:52]} | {esperado} | {busca} |"
         if completo:
-            linha += f" {'✓' if l['ok_resposta'] else '✗'} | {', '.join(l['citados']) or '—'} |"
+            marca = {True: "✓", False: "✗", None: "· n/a"}[l["ok_resposta"]]
+            linha += f" {marca} | {', '.join(l['citados']) or '—'} |"
         out.append(linha)
 
     out += ["", "## Detalhe por pergunta", ""]

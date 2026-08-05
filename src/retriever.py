@@ -43,7 +43,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+import unicodedata
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -59,6 +61,10 @@ from src.config import (  # noqa: E402
 )
 from src.glossario import expandir  # noqa: E402
 
+# Fusão de rankings (RRF). O 60 é o valor da publicação original e não foi ajustado ao
+# gabarito: mexer nele seria calibrar o sistema na própria bateria que o avalia.
+K_RRF = 60
+
 # Quantos candidatos buscar por resultado pedido, antes de filtrar por vigencia. Como so 9% do
 # indice esta fora de vigor, 4x cobre com folga; se ainda faltar, a busca amplia sozinha.
 FATOR_FOLGA = 4
@@ -73,6 +79,33 @@ FATOR_FOLGA = 4
 # e desprezivel -- 8 trechos de ~600 caracteres dao ~1.200 tokens de contexto --, e passar de
 # 8 comeca a encher a interface de texto que o usuario nao vai ler.
 K_PADRAO = 8
+
+
+def tokenizar(texto: str) -> list[str]:
+    """Tokens para a busca léxica: minúsculo, sem acento, sem pontuação.
+
+    Tirar o acento importa: quem digita "minigeracao" precisa casar com "minigeração", e o
+    BM25 compara token com token, sem a tolerância que o modelo de embedding tem.
+    """
+    sem_acento = unicodedata.normalize("NFKD", texto.lower())
+    sem_acento = "".join(c for c in sem_acento if not unicodedata.combining(c))
+    return re.findall(r"[a-z0-9]{2,}", sem_acento)
+
+
+def fundir_rrf(rankings: list[list[int]], k0: int = K_RRF) -> list[int]:
+    """Reciprocal Rank Fusion: cada lista contribui 1/(k0 + posição) para cada item.
+
+    Escolhida em vez de somar os scores ponderados porque as duas escalas não são comparáveis:
+    a similaridade densa vive espremida entre 0,80 e 0,92 (medido), enquanto o BM25 é ilimitado
+    e depende da raridade dos termos. Normalizar essas escalas exigiria calibração, e calibrar
+    contra a bateria de aceitação seria ajustar o sistema ao próprio gabarito. O RRF ignora a
+    magnitude e usa só a ordem, que é o que as duas buscas têm de comparável.
+    """
+    pontos: dict[int, float] = {}
+    for ranking in rankings:
+        for posicao, item in enumerate(ranking, 1):
+            pontos[item] = pontos.get(item, 0.0) + 1.0 / (k0 + posicao)
+    return [item for item, _ in sorted(pontos.items(), key=lambda kv: -kv[1])]
 
 
 @dataclass(frozen=True)
@@ -106,12 +139,14 @@ class Retriever:
         caminho_indice: Path = CAMINHO_INDICE,
         modelo: str = MODELO_EMBEDDING,
         expandir_consulta: bool = True,
+        hibrido: bool = True,
     ) -> None:
         self.caminho_chunks = Path(caminho_chunks)
         self.caminho_indice = Path(caminho_indice)
         self.nome_modelo = modelo
-        # Desligavel para medir o efeito do glossario -- ver scripts/avaliar.py --sem-glossario.
+        # Desligaveis para medir o efeito de cada um -- ver scripts/avaliar.py.
         self.expandir_consulta = expandir_consulta
+        self.hibrido = hibrido
 
     # -- carregamento preguicoso -------------------------------------------------------
 
@@ -148,6 +183,19 @@ class Retriever:
 
         return SentenceTransformer(self.nome_modelo)
 
+    @cached_property
+    def bm25(self):
+        """Índice léxico sobre os mesmos textos que foram vetorizados.
+
+        Construído em memória na primeira busca: 1.188 documentos curtos custam milissegundos e
+        não justificam um artefato em disco. Usa `texto_busca` -- e não `texto` -- para que os
+        dois lados da fusão enxerguem exatamente o mesmo conteúdo, incluindo a trilha
+        estrutural e o caput que o Bloco 2 acrescentou.
+        """
+        from rank_bm25 import BM25Okapi
+
+        return BM25Okapi([tokenizar(c["texto_busca"]) for c in self.chunks])
+
     # -- busca -------------------------------------------------------------------------
 
     def _vetorizar(self, pergunta: str):
@@ -180,6 +228,10 @@ class Retriever:
 
         consulta, _ = self.preparar_consulta(pergunta)
         vetor = self._vetorizar(consulta)
+
+        if self.hibrido:
+            return self._buscar_hibrido(consulta, vetor, situacoes, k)
+
         limite = self.indice.ntotal
         buscar_n = min(limite, max(k * FATOR_FOLGA, k))
 
@@ -190,6 +242,39 @@ class Retriever:
             if len(resultados) >= k or buscar_n >= limite:
                 return resultados
             buscar_n = min(limite, buscar_n * 4)
+
+    def _buscar_hibrido(self, consulta: str, vetor, situacoes, k: int) -> list[Resultado]:
+        """Funde o ranking semantico com o lexico.
+
+        As duas buscas falham por motivos opostos e complementares: a densa perde o termo
+        tecnico exato quando ele concorre com dezenas de artigos que falam do mesmo tema, e a
+        lexica nao encontra o que foi perguntado com outras palavras. Medido na bateria, a
+        fusao levou a recuperacao de 6/7 para 7/7, sem piorar nenhuma pergunta.
+        """
+        import numpy as np
+
+        scores_densos, posicoes = self.indice.search(vetor, self.indice.ntotal)
+        score_por_posicao = {int(p): float(s) for p, s in zip(posicoes[0], scores_densos[0])
+                             if p >= 0}
+
+        permitido = [
+            i for i in range(len(self.chunks))
+            if situacoes is None or self.chunks[i]["situacao"] in situacoes
+        ]
+        permitidos = set(permitido)
+
+        ranking_denso = [int(p) for p in posicoes[0] if int(p) in permitidos]
+        pontos_bm25 = self.bm25.get_scores(tokenizar(consulta))
+        ranking_lexico = [i for i in np.argsort(pontos_bm25)[::-1] if int(i) in permitidos]
+
+        fundido = fundir_rrf([ranking_denso, [int(i) for i in ranking_lexico]])[:k]
+
+        # O score exibido continua sendo a similaridade semantica: e a unica das duas escalas
+        # que significa algo para quem le ("quao proximo do que perguntei"). A posicao na lista
+        # e que reflete a fusao.
+        return self._montar(
+            [score_por_posicao.get(i, 0.0) for i in fundido], fundido, situacoes, k
+        )
 
     def _montar(self, scores, posicoes, situacoes, k: int) -> list[Resultado]:
         saida: list[Resultado] = []

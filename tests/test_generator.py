@@ -21,6 +21,7 @@ from src.generator import (  # noqa: E402
     Generator,
     artigos_disponiveis,
     montar_prompt,
+    normalizar_recusa,
     verificar_citacoes,
 )
 from src.retriever import Resultado  # noqa: E402
@@ -108,6 +109,21 @@ r2 = g2.responder("qualquer", TRECHOS)
 checar("citação inventada derruba a confiabilidade", r2.confiavel, False)
 checar("e vira aviso para a interface",
        any(a.startswith("CITACAO_NAO_RECUPERADA") for a in r2.avisos), True)
+
+print("\nafirmar e recusar na mesma resposta conta como recusa")
+# Caso real da bateria: o modelo citou o Art. 655-C, afirmou "superior a 500 kW" (que é o
+# limite da garantia de fiel cumprimento, não a fronteira micro/mini) e emendou a recusa.
+misto = ("Art. 655-C. A minigeração distribuída tem potência instalada superior a 500 kW. "
+         + FRASE_SEM_RESPOSTA)
+checar("recusa no fim do texto é detectada", normalizar_recusa(misto)[1], True)
+checar("a afirmação não sobrevive", normalizar_recusa(misto)[0], FRASE_SEM_RESPOSTA)
+checar("resposta legítima não é confundida com recusa",
+       normalizar_recusa("Os créditos expiram em 60 meses, Art. 655-L."),
+       ("Os créditos expiram em 60 meses, Art. 655-L.", False))
+g_misto = Generator(cliente=ClienteFalso(misto))
+r_misto = g_misto.responder("qualquer", TRECHOS)
+checar("o Generator descarta a afirmação contraditória", r_misto.sem_resposta, True)
+checar("e não credita citação a uma recusa", r_misto.artigos_citados, [])
 
 g3 = Generator(cliente=ClienteFalso(FRASE_SEM_RESPOSTA))
 r3 = g3.responder("qual o preço de um painel solar?", TRECHOS)

@@ -52,7 +52,8 @@ checar("generator instanciado uma vez", app.generator is not None, True)
 print("\nformatação das fontes: o usuário precisa conseguir conferir contra a norma")
 saida = app.formatar_fontes([trecho()])
 checar("numera o trecho", saida.startswith("**1. Art. 655-L**"), True)
-checar("mostra a similaridade", "similaridade 0.884" in saida, True)
+checar("rotula o score como semântico, já que a ordem vem da fusão com a busca léxica",
+       "similaridade semântica 0.884" in saida, True)
 checar("mostra a trilha estrutural", "Título II - PARTE ESPECIAL" in saida, True)
 checar("mostra a procedência da alteração", "REN ANEEL 1.059/2023" in saida, True)
 checar("texto da norma vai em blockquote, separado do que o sistema escreve",

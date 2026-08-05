@@ -18,6 +18,10 @@ pdfplumber>=0.11,<0.12
 sentence-transformers>=5.0,<6.0   # embeddings multilingues (roda local, sem API paga)
 faiss-cpu>=1.12,<2.0              # indice vetorial
 
+# Busca lexica, fundida com a densa por RRF. Python puro, sem torch, ~10 KB. Entrou por
+# medicao: levou a recuperacao da bateria de 6/7 para 7/7, sem piorar nenhuma pergunta.
+rank-bm25>=0.2,<0.3
+
 # --- Runtime: app.py ---
 gradio>=6.0,<7.0                  # interface
 

@@ -15,7 +15,7 @@
 | 5 | O que é o medidor bidirecional e quando ele é exigid | recusar | — | ✓ | — |
 | 6 | Quais documentos são exigidos para o protocolo de ac | Art. 67 | ✓ pos 2 | ✓ | Art. 67 |
 | 7 | Existe prazo de validade para os créditos de energia | Art. 655-L | ✓ pos 2 | ✓ | Art. 655-L |
-| 8 | O que muda para sistemas conectados em condomínios ( | Art. 2, Art. 655-C | ✓ pos 6 | ✓ | Art. 2, Art. 137, Art. 83 |
+| 8 | O que muda para sistemas conectados em condomínios ( | Art. 2, Art. 655-C | ✓ pos 6 | ✓ | Art. 2, Art. 127, Art. 83 |
 | 9 | Qual o preço de um painel solar? | recusar | — | ✓ | — |
 | 10 | e a conta? | recusar | — | ✓ | — |
 
@@ -29,8 +29,8 @@
 ### 2. Qual a diferença entre microgeração e minigeração distribuída em termos de potência?
 *Gabarito:* Art. 2, XXIX-A e XXIX-B, definem micro (até 75 kW) e minigeração (acima de 75 kW até 3 ou 5 MW conforme a fonte).
 *Top-8 recuperado:* Art. 655-B, Art. 655-R, Art. 31, Art. 655-R, Art. 655-C, Art. 655-O, Art. 655-R, Art. 655-W
-*Resposta:* Art. 655-C. O consumidor interessado em implantar minigeração distribuída com potência instalada superior a 500 kW. 
-Art. 655-B não especifica limite de potência para microgeração.
+*Resposta:* Art. 655-C. A minigeração distribuída tem potência instalada superior a 500 kW. 
+Art. 655-B não especifica o limite de potência para microgeração.
 
 ### 3. O sistema de compensação de energia elétrica permite acumular créditos por quanto tempo?
 *Gabarito:* Art. 655-L: 'Os créditos de energia expiram em 60 meses após a data do faturamento em que foram gerados.'
@@ -40,7 +40,7 @@ Art. 655-B não especifica limite de potência para microgeração.
 ### 4. É obrigatório ter um responsável técnico com ART para o projeto?
 *Gabarito:* Art. 33: 'O projeto e a execução das instalações elétricas [...] devem possuir responsável técnico, caso seja exigível na legislação específica.'
 *Top-8 recuperado:* Art. 33, Art. 50, Art. 481, Art. 86, Art. 111, Art. 484, Art. 53, Art. 501
-*Resposta:* Sim, é obrigatório ter um responsável técnico com ART para o projeto, caso seja exigível na legislação específica, conforme Art. 33.
+*Resposta:* Art. 33. O projeto e a execução das instalações elétricas de responsabilidade do consumidor e demais usuários devem possuir responsável técnico, caso seja exigível na legislação específica.
 
 ### 5. O que é o medidor bidirecional e quando ele é exigido?
 *Gabarito:* A norma não define 'medidor bidirecional'. 'bidirecional' aparece uma única vez, no Art. 555, sobre fluxo bidirecional -- outro assunto. A premissa da pergunta é falsa, e a resposta correta é dizer que não encontrou.
@@ -62,7 +62,7 @@ Art. 67, §5º, a distribuidora pode dispensar a apresentação parcial ou total
 ### 8. O que muda para sistemas conectados em condomínios (geração compartilhada)?
 *Gabarito:* Art. 2, XXII-A, define geração compartilhada como modalidade do SCEE por consórcio, cooperativa ou condomínio; o Art. 655-C enumera as modalidades para fins de conexão. Aceita qualquer um dos dois: os dois respondem.
 *Top-8 recuperado:* Art. 48, Art. 47, Art. 137, Art. 35, Art. 127, Art. 2, Art. 83, Art. 73
-*Resposta:* Art. 2, Art. 137 e Art. 83 tratam de microgeração e minigeração distribuída, mas apenas o Art. 2 menciona explicitamente a conexão da microgeração ou minigeração distribuída na unidade consumidora de atendimento das áreas comuns, distinta das demais. Art. 2 define a responsabilidade do condomínio, da administração ou do proprietário do empreendimento pela unidade consumidora em que se conecta a microgeração ou minigeração distribuída.
+*Resposta:* Art. 2, Art. 127 e Art. 83 tratam de definições e procedimentos para conexão de microgeração ou minigeração distribuída, incluindo em condomínios. Art. 2 define a conexão da microgeração ou minigeração distribuída na unidade consumidora de atendimento das áreas comuns. Art. 127 dispõe sobre a celebração de contratos para central geradora e conexão a instalações de transmissão. Art. 83 aborda a aprovação do orçamento de conexão para microgeração e minigeração distribuída.
 
 ### 9. Qual o preço de um painel solar?
 *Gabarito:* Fora do escopo da norma. Testa se o sistema inventa quando não sabe.

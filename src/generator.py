@@ -174,6 +174,31 @@ def verificar_citacoes(texto: str, trechos: list[Resultado]) -> tuple[list[str],
     return citados, avisos
 
 
+RE_RECUSA = re.compile(r"n[ãa]o\s+encontrei", re.IGNORECASE)
+
+
+def normalizar_recusa(texto: str) -> tuple[str, bool]:
+    """Se a resposta contém a recusa em qualquer posição, ela É uma recusa.
+
+    Observado na bateria, com o Llama 3.3 na pergunta 2:
+
+        "Art. 655-C. A minigeração distribuída tem potência instalada superior a 500 kW.
+         Não encontrei essa informação nos trechos [...]"
+
+    O modelo afirmou e recusou na mesma resposta -- e a afirmação estava errada: 500 kW é o
+    limite que dispara a garantia de fiel cumprimento no Art. 655-C, não a fronteira entre
+    micro e minigeração (75 kW). A citação era honesta, o que torna o erro mais convincente.
+
+    Detectar a recusa só no início do texto deixava isso passar como resposta válida. Aqui ela
+    é procurada em qualquer posição, e quando aparece o texto inteiro é substituído pela frase
+    de recusa: se o modelo declara que não encontrou a informação, nada do que ele afirmou ao
+    lado disso se sustenta. Descartar a afirmação é a única leitura segura.
+    """
+    if RE_RECUSA.search(texto):
+        return FRASE_SEM_RESPOSTA, True
+    return texto, False
+
+
 class Generator:
     """Formula a resposta a partir dos trechos, sem acesso a nada além deles."""
 
@@ -221,8 +246,7 @@ class Generator:
             temperature=0,
         )
         texto = (resposta.choices[0].message.content or "").strip()
-
-        sem_resposta = texto.lower().startswith("não encontrei")
+        texto, sem_resposta = normalizar_recusa(texto)
         citados, avisos = verificar_citacoes(texto, trechos)
 
         if not sem_resposta and not citados:

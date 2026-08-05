@@ -69,7 +69,10 @@ def formatar_fontes(trechos) -> str:
 
     partes = []
     for i, t in enumerate(trechos, 1):
-        cabecalho = f"**{i}. {t.artigo}**{_rotulo_situacao(t.situacao)} · similaridade {t.score:.3f}"
+        # "semântica" no rótulo não é preciosismo: a ordem da lista vem da fusão com a busca
+        # léxica, então o número não decresce monotonicamente e sem o rótulo pareceria erro.
+        cabecalho = (f"**{i}. {t.artigo}**{_rotulo_situacao(t.situacao)} · "
+                     f"similaridade semântica {t.score:.3f}")
         linhas = [cabecalho]
         if t.trilha:
             linhas.append(f"<sub>{' › '.join(t.trilha)}</sub>")

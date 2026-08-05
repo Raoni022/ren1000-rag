@@ -88,14 +88,19 @@ PDF do texto compilado (CEDOC/ANEEL)
 
 pergunta
    └─ src/glossario.py    ponte de vocabulário (leigo → norma)
-   └─ src/retriever.py    top-k no FAISS, filtrado por vigência
+   └─ src/retriever.py    híbrida: FAISS + BM25 fundidos por RRF, filtrado por vigência
    └─ src/generator.py    LLM sobre os trechos + verificação de citação
    └─ app.py              resposta + trechos-fonte
 ```
 
+A busca é **híbrida** porque as duas metades falham por motivos opostos: a semântica perde o
+termo técnico exato quando ele concorre com dezenas de artigos do mesmo tema, e a léxica não
+acha o que foi perguntado com outras palavras. Fundir os dois rankings por Reciprocal Rank
+Fusion levou a recuperação de 6/7 para **7/7**, sem piorar nenhuma pergunta.
+
 **Stack:** Python 3.11 · `pdfplumber` · `sentence-transformers` com
-`intfloat/multilingual-e5-small` (roda local, sem API paga na busca) · `faiss-cpu` · `gradio` ·
-qualquer LLM com API compatível com a da OpenAI · Hugging Face Spaces.
+`intfloat/multilingual-e5-small` (roda local, sem API paga na busca) · `faiss-cpu` ·
+`rank-bm25` · `gradio` · qualquer LLM com API compatível com a da OpenAI · Hugging Face Spaces.
 
 O corpus é uma norma única e estática, então FAISS local basta — não há motivo para banco
 vetorial gerenciado.
@@ -170,9 +175,14 @@ Bateria de 10 perguntas com gabarito verificado dispositivo por dispositivo
 **recuperação** (o artigo certo está entre os `k` trechos?) e **aceitação** (a resposta cita o
 artigo certo, ou recusa quando deve?).
 
-Resultado atual: **8/10 na aceitação, 6/7 na recuperação, 0 citações inventadas** —
-[relatório completo](docs/AVALIACAO.md). É uma medição única: a cota diária do free tier acabou
-durante a avaliação e não deu para repetir a bateria.
+Resultado: **7/7 na recuperação** e **8/10 na aceitação, com 0 citações inventadas**
+([relatório](docs/AVALIACAO.md)).
+
+Uma ressalva de honestidade: o 8/10 foi medido duas vezes, com as mesmas duas falhas, **antes**
+da busca híbrida. A híbrida elevou a recuperação de 6/7 para 7/7 e fez subir o ranking das duas
+perguntas que falhavam — mas recuperar o artigo certo é condição necessária, não suficiente, e a
+cota diária do free tier acabou antes de refazer a bateria completa. O placar em
+`docs/AVALIACAO.md` é o da última execução completa, com busca só semântica.
 
 ## Testes
 
@@ -211,6 +221,9 @@ O registro completo do que foi medido, decidido e **descartado** está em
   no corpus; a norma chama de `orçamento de conexão`. Nem busca vetorial nem BM25 resolvem isso.
 - **Afrouxar a recusa custou a recusa** — o ajuste de prompt que consertou uma pergunta quebrou
   outra, e só apareceu porque havia régua.
+- **Busca híbrida entrou por medição, não por gosto** — foi a terceira tentativa de consertar o
+  ranking do Art. 2, depois de duas hipóteses refutadas. Entrou porque levou a recuperação a
+  7/7 **sem piorar nenhuma pergunta**.
 
 ## Progresso
 

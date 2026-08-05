@@ -19,7 +19,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.config import SITUACAO_REVOGADO, SITUACAO_SUPERADO, SITUACAO_VIGENTE  # noqa: E402
-from src.retriever import Retriever  # noqa: E402
+from src.retriever import Retriever, fundir_rrf, tokenizar  # noqa: E402
 
 falhas: list[str] = []
 
@@ -62,7 +62,9 @@ def montar(situacoes: list[str]) -> RetrieverFalso:
 
     (pasta / "chunks.json").write_text(json.dumps(chunks, ensure_ascii=False), encoding="utf-8")
     faiss.write_index(indice, str(pasta / "i.faiss"))
-    return RetrieverFalso(pasta / "chunks.json", pasta / "i.faiss")
+    # hibrido=False: estes testes verificam o filtro, o corte em k e a ordenacao a partir de
+    # vetores conhecidos. A fusao lexica e testada a parte, em fundir_rrf() e tokenizar().
+    return RetrieverFalso(pasta / "chunks.json", pasta / "i.faiss", hibrido=False)
 
 
 print("filtro de vigencia: o que nao chega ao contexto nao pode ser citado por engano")
@@ -97,6 +99,25 @@ checar("pedir mais do que existe devolve o que ha", len(r2.buscar("q", k=99)), 2
 print("\nentradas degeneradas")
 checar("pergunta vazia devolve lista vazia", r.buscar(""), [])
 checar("pergunta so com espacos devolve lista vazia", r.buscar("   "), [])
+
+print("\ntokenizacao lexica: acento nao pode separar quem digita sem ele")
+checar("tira acento e minusculiza",
+       tokenizar("Minigeração Distribuída"), ["minigeracao", "distribuida"])
+checar("'minigeracao' e 'minigeração' viram o mesmo token",
+       tokenizar("minigeracao") == tokenizar("minigeração"), True)
+checar("descarta pontuacao e tokens de 1 letra",
+       tokenizar("Art. 655-C, § 1º:"), ["art", "655", "1o"])
+
+print("\nfusao RRF: usa a ordem, nunca a magnitude dos scores")
+checar("item bem colocado nas duas listas vence",
+       fundir_rrf([[7, 1, 2], [7, 3, 4]])[0], 7)
+checar("consenso ganha de primeiro lugar isolado",
+       fundir_rrf([[1, 9, 9], [2, 9, 9]])[0], 9)
+checar("uniao de todos os itens, sem repetir",
+       sorted(fundir_rrf([[1, 2], [2, 3]])), [1, 2, 3])
+checar("lista unica preserva a ordem original", fundir_rrf([[5, 6, 7]]), [5, 6, 7])
+# Se o RRF olhasse magnitude, um score altissimo em uma lista dominaria. Ele olha posicao.
+checar("ranking vazio nao quebra a fusao", fundir_rrf([[], [4, 5]]), [4, 5])
 
 print("\nsincronia entre indice e chunks")
 # Um vetor a mais que chunks: a posicao no indice deixaria de apontar para o artigo certo.
