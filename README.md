@@ -196,17 +196,21 @@ Bateria de 10 perguntas com gabarito verificado dispositivo por dispositivo
 **recuperação** (o artigo certo está entre os `k` trechos?) e **aceitação** (a resposta cita o
 artigo certo, ou recusa quando deve?).
 
-**Recuperação: 7/7.** Métrica gratuita, medida com a busca híbrida em vigor.
+**Recuperação: 7/7. Aceitação: 8/10. Citações inventadas: 0.** Medido com o sistema completo,
+busca híbrida inclusive ([relatório](docs/AVALIACAO.md)).
 
-**Aceitação: 8/10 na última execução completa**, com 0 citações inventadas — medida duas vezes,
-com as mesmas duas falhas, então não é resultado de uma execução isolada. Só que essas duas
-execuções são **anteriores** à busca híbrida.
+As duas falhas que restam não são invenção, e vale distinguir:
 
-Depois da híbrida deu para medir 7 das 10 perguntas antes de a cota diária do free tier acabar:
-**6 das 7 corretas**, e a pergunta 2 — que antes respondia errado citando o Art. 655-C — passou a
-citar o Art. 2 corretamente. As 3 restantes ficaram sem medir. O
-[relatório](docs/AVALIACAO.md) sai marcado como `PARCIAL` justamente para esse placar não ser
-lido como completo.
+- **Pergunta 1** — o `Art. 64` é recuperado em quinto, mas o modelo prefere recusar a arriscar.
+  Conta como falha; é o tipo seguro dela. Antes da busca híbrida esta pergunta produzia algo
+  pior: citava o `Art. 90`, que trata do caso especial da Lei 14.195 (45 dias) em vez da regra
+  geral (15 e 30 dias) — resposta errada com citação válida.
+- **Pergunta 10** — `"e a conta?"` deveria ser recusada por ser vaga demais para se saber o que
+  foi perguntado. O sistema responde a definição de fatura do `Art. 2`: correta e corretamente
+  citada, mas presumindo a intenção. É falha de produto, não de veracidade.
+
+O placar ficou igual ao anterior à busca híbrida, mas o sistema é mais seguro: uma resposta
+confiantemente errada virou resposta certa, e uma citação errada virou recusa.
 
 ## Testes
 

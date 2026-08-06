@@ -365,11 +365,25 @@ hoje só o Art. 323, pelo Despacho ANEEL 2.006/2024).
 | + `k=8` | 6/7 | 7/10 |
 | + prompt ciente da diferença de vocabulário | 6/7 | 7/10 (quebrou a 10) |
 | + recusa explícita para pergunta vaga | 6/7 | **8/10** |
-| + busca híbrida (BM25 + RRF) | **7/7** | pendente de cota |
+| + busca híbrida (BM25 + RRF) | **7/7** | **8/10** |
 
-O 8/10 foi medido duas vezes, com as mesmas duas falhas — não é resultado de uma execução
-isolada. A última linha é a única em que a métrica de aceitação não pôde ser refeita: a cota
-diária do free tier acabou. A recuperação, que não custa chamada de API, foi medida.
+O 8/10 foi medido três vezes ao todo, a última já com o sistema completo — não é resultado de
+uma execução isolada. O placar não mudou com a busca híbrida, mas **o conjunto de falhas mudou,
+e para melhor**:
+
+| | antes da híbrida | depois |
+|---|---|---|
+| Pergunta 1 | citava o Art. 90 — regra errada, citação válida | recusa honestamente |
+| Pergunta 2 | "minigeração tem potência superior a 500 kW" — **errado** | cita o Art. 2, correto |
+| Pergunta 10 | recusava, como esperado | responde a definição de fatura do Art. 2 |
+
+Duas falhas viraram comportamento seguro e uma passou a acertar; em troca, a 10 deixou de
+recusar uma pergunta vaga. A resposta dela é correta e corretamente citada — o defeito é
+presumir a intenção de `"e a conta?"`, o que é falha de produto, não de veracidade.
+
+Trocar uma resposta confiantemente errada por uma correta, ao custo de responder uma pergunta
+ambígua, é um bom negócio para este projeto. Fica registrado porque é o tipo de mudança que um
+placar idêntico esconderia.
 
 O `k=8` não é ajuste ao gabarito: o recall medido é 3/7 em k=3, 4/7 em k=5, 6/7 em k=8 e 7/7 só
 em k=15. Oito é onde a curva achata, a ~1.200 tokens de contexto.
@@ -380,29 +394,28 @@ em vez de recusar. Afrouxar a recusa custou a recusa. O conserto foi separar os 
 legítimos de recusar: nenhum trecho trata do assunto, **ou** a pergunta é vaga demais para se
 saber o que foi perguntado.
 
-### As duas falhas do último placar completo
+### As duas falhas que restam
 
-Ambas foram medidas **antes** da busca híbrida, e as duas causas eram de ranking:
+**Pergunta 1** — o `Art. 64` é recuperado em quinto, mas o modelo prefere recusar a arriscar.
+Antes da híbrida ele citava o `Art. 90`, que trata do caso especial da Lei 14.195 (45 dias) em
+vez da regra geral (15 e 30 dias): citação honesta, artigo existente, usuário mal informado. O
+gabarito **não** foi ampliado para acomodar nenhuma das duas versões.
 
-**Pergunta 1** — o `Art. 64` era recuperado só em oitavo, e o modelo preferia o `Art. 90`, que
-trata do caso especial da Lei 14.195 (45 dias) em vez da regra geral (15 e 30 dias). A citação
-era honesta e o artigo existe, mas o usuário sairia mal informado. Contou como falha, e o
-gabarito **não** foi ampliado para acomodar. Com a híbrida o Art. 64 subiu para o quinto lugar.
+**Pergunta 10** — `"e a conta?"` deixou de ser recusada. O caminho para consertar é o mesmo já
+usado uma vez: apertar a instrução de recusa por vagueza sem afrouxar o resto. Não foi feito
+agora porque a evidência do quarto passo desta seção é que mexer nessa instrução tem efeito
+colateral, e refazer a bateria custa ~25 mil tokens da cota diária.
 
-**Pergunta 2** — a definição do `Art. 2` ficava fora do top-8. Com a híbrida ela entrou, em
-oitavo. Foi essa pergunta que produziu a resposta errada da seção 8.
-
-Em nenhum dos dois casos dá para afirmar que a aceitação subiu: recuperar o artigo certo é
-condição necessária, não suficiente — o modelo ainda precisa escolher o trecho certo entre os
-oito. Isso só se sabe refazendo a bateria completa.
+A pergunta 2, que era a outra falha e produziu a resposta errada da seção 8, passou a acertar:
+a definição do `Art. 2` entrou no top-8 e o modelo a citou corretamente.
 
 ---
 
 ## 12. Limite de cota do free tier
 
 Cada pergunta consome ~2,5 mil tokens com `k=8`. O free tier da Groq dá **100 mil tokens por
-dia** para o `llama-3.3-70b-versatile` — ou seja, **algumas dezenas de perguntas por dia** num
-Space público.
+dia** para o `llama-3.3-70b-versatile` — ou seja, **algumas dezenas de perguntas por dia** na
+demo pública.
 
 Ao estourar, o app avisa em português que a cota acabou e continua entregando os trechos da
 norma, em vez de mostrar o erro cru. Sem chave nenhuma, ele degrada para busca pura: a
