@@ -1,28 +1,30 @@
-# Python 3.11 (o venv local usa `py -3.11`; o HF Spaces roda 3.10/3.11).
-# NAO usar 3.14: torch/faiss-cpu ainda nao publicam wheel para essa versao.
+# DEPENDENCIAS DE RUNTIME -- o que o app precisa para responder uma pergunta.
+#
+# Nao inclui torch, transformers nem sentence-transformers. Em producao o sistema vetoriza UMA
+# pergunta por vez, contra um indice ja construido, e para isso o ONNX Runtime basta. Medido:
+#
+#     torch + sentence-transformers .... 846 MB de RSS,  ~790 MB em disco
+#     ONNX int8 ....................... 456 MB de RSS,   ~50 MB em disco
+#
+# O ranking da bateria e identico nos dois. Ver src/embedder.py.
+#
+# Para CONSTRUIR o indice (roda uma vez, offline), use requirements-build.txt.
+#
+# Python 3.11. NAO usar 3.14: faiss-cpu ainda nao publica wheel para essa versao.
 #
 # Os limites superiores nao sao excesso de zelo: o Gradio 6 moveu `theme` do construtor do
-# Blocks para o launch(), e uma faixa aberta faria o Space instalar uma versao com API
-# diferente da testada aqui. As versoes abaixo sao as efetivamente exercitadas pelos testes.
+# Blocks para o launch(), e uma faixa aberta faria o deploy instalar uma versao com API
+# diferente da testada aqui.
 
-# --- Build-time: scripts/ (rodados uma vez, offline, para construir o indice) ---
-# pdfplumber e nao pypdf: o pypdf insere espacos dentro das palavras neste PDF
-# ("identific acao"). Medicao e justificativa no docstring de scripts/extract_text.py.
-# Licenca MIT, como o pdfminer.six em que ele se apoia.
-pdfplumber>=0.11,<0.12
-
-# --- Build-time + runtime: busca semantica ---
-# Modelo: intfloat/multilingual-e5-small (janela de 512 tokens, 384 dims, ~470 MB).
-# O paraphrase-multilingual-MiniLM-L12-v2 do plano original foi descartado: janela de 128
-# tokens (~450 caracteres) contra chunks de ate 1.200 -- truncaria a maior parte do corpus.
-sentence-transformers>=5.0,<6.0   # embeddings multilingues (roda local, sem API paga)
+# --- Busca ---
+onnxruntime>=1.20,<2.0            # inferencia do modelo de embedding, sem torch
+tokenizers>=0.20,<1.0             # tokenizador do e5-small (Rust, nao depende de transformers)
+huggingface-hub>=0.26,<1.0        # baixa o ONNX e o tokenizador na primeira execucao
 faiss-cpu>=1.12,<2.0              # indice vetorial
+rank-bm25>=0.2,<0.3               # busca lexica, fundida com a densa por RRF
+numpy>=1.26,<3.0
 
-# Busca lexica, fundida com a densa por RRF. Python puro, sem torch, ~10 KB. Entrou por
-# medicao: levou a recuperacao da bateria de 6/7 para 7/7, sem piorar nenhuma pergunta.
-rank-bm25>=0.2,<0.3
-
-# --- Runtime: app.py ---
+# --- Interface e resposta ---
 gradio>=6.0,<7.0                  # interface
 
 # Cliente OpenAI-compatível, nao SDK de um provedor especifico. Groq, Gemini, DeepSeek e

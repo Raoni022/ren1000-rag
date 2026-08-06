@@ -110,9 +110,16 @@ termo técnico exato quando ele concorre com dezenas de artigos do mesmo tema, e
 acha o que foi perguntado com outras palavras. Fundir os dois rankings por Reciprocal Rank
 Fusion levou a recuperação de 6/7 para **7/7**, sem piorar nenhuma pergunta.
 
-**Stack:** Python 3.11 · `pdfplumber` · `sentence-transformers` com
-`intfloat/multilingual-e5-small` (roda local, sem API paga na busca) · `faiss-cpu` ·
-`rank-bm25` · `gradio` · qualquer LLM com API compatível com a da OpenAI · Hugging Face Spaces.
+**Runtime não carrega `torch`.** Como o índice é pré-computado, em produção o sistema vetoriza
+uma pergunta por vez — e para isso o ONNX Runtime basta. Medido: **582 MB** de RSS para o app
+inteiro, contra ~950 MB com `torch`, e ~740 MB a menos em disco. A variante quantizada foi
+validada contra a bateria completa e dá **ranking idêntico**, artigo por artigo.
+
+**Stack — runtime:** Python 3.11 · `onnxruntime` + `tokenizers` com o ONNX oficial do
+`intfloat/multilingual-e5-small` · `faiss-cpu` · `rank-bm25` · `gradio` · qualquer LLM com API
+compatível com a da OpenAI.
+
+**Stack — build (roda uma vez, offline):** `pdfplumber` · `sentence-transformers`.
 
 O corpus é uma norma única e estática, então FAISS local basta — não há motivo para banco
 vetorial gerenciado.
@@ -128,6 +135,15 @@ interpretador padrão em algumas máquinas.
 py -3.11 -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt
 ```
+
+Isso instala só o que o app precisa para responder. Para **construir o índice** você também
+precisa das dependências de build, que trazem `torch` e ficam de fora do deploy:
+
+```bash
+.venv/Scripts/python.exe -m pip install -r requirements-build.txt
+```
+
+Se você só quer rodar o app, o índice já vem versionado em `index/` — pule para o passo 3.
 
 ### 1. Obter o texto da norma
 
@@ -205,6 +221,7 @@ lido como completo.
 .venv/Scripts/python.exe tests/test_extract_text.py
 .venv/Scripts/python.exe tests/test_chunk_text.py
 .venv/Scripts/python.exe tests/test_build_index.py
+.venv/Scripts/python.exe tests/test_embedder.py
 .venv/Scripts/python.exe tests/test_retriever.py
 .venv/Scripts/python.exe tests/test_generator.py
 .venv/Scripts/python.exe tests/test_glossario.py
@@ -239,6 +256,10 @@ O registro completo do que foi medido, decidido e **descartado** está em
 - **Busca híbrida entrou por medição, não por gosto** — foi a terceira tentativa de consertar o
   ranking do Art. 2, depois de duas hipóteses refutadas. Entrou porque levou a recuperação a
   7/7 **sem piorar nenhuma pergunta**.
+- **ONNX quantizado no runtime, fp32 descartado** — a fp32 economizava 57 MB e tinha pico
+  *pior* que o `torch`; só a int8 valia (846 → 456 MB). E uma medição que quase virou conclusão
+  errada: o primeiro teste indicava degradação, mas o defeito estava no próprio teste, que
+  prefixava a pergunta duas vezes.
 
 ## Progresso
 
@@ -263,8 +284,11 @@ O frontmatter no topo deste README já é a configuração do Space. Falta:
    `LLM_MODEL`.
 3. `git push` deste repositório para o remoto do Space.
 
-O índice já vai versionado (`index/`, 3,8 MB), então o Space não recalcula nada — só baixa o
-modelo de embedding (~470 MB) na primeira execução.
+O índice já vai versionado (`index/`, 3,8 MB), então nada é recalculado — só o ONNX quantizado
+(113 MB) é baixado na primeira execução.
+
+**Requisito de memória: ~600 MB.** Isso vale para qualquer hospedagem, não só o Space. Cabe
+folgado em instância de 1 GB; **não cabe** em tier de 512 MB.
 
 **Sobre a cota:** cada pergunta consome ~2,5 mil tokens e o free tier da Groq dá 100 mil por
 dia, ou seja, algumas dezenas de perguntas diárias. Ao esgotar, o app avisa em português e

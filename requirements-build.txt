@@ -1,0 +1,21 @@
+# DEPENDENCIAS DE BUILD -- so para construir o indice, rodando os scripts de scripts/.
+#
+# NAO instalar em producao: sao ~790 MB de disco (torch, transformers, scipy, sympy, networkx)
+# que existem para vetorizar os 1.188 chunks uma unica vez. O app em si nao importa nada disto.
+#
+#     .venv/Scripts/python.exe -m pip install -r requirements-build.txt
+#     .venv/Scripts/python.exe scripts/extract_text.py --input data/ren1000.pdf
+#     .venv/Scripts/python.exe scripts/chunk_text.py
+#     .venv/Scripts/python.exe scripts/build_index.py
+#
+# O indice do lado dos documentos e gerado em fp32, sem quantizacao: o custo e pago uma vez,
+# offline, e nao ha motivo para abrir mao de precisao ali.
+
+-r requirements.txt
+
+# pdfplumber e nao pypdf: o pypdf insere espacos dentro das palavras neste PDF
+# ("identific acao"). Medicao e justificativa no docstring de scripts/extract_text.py.
+pdfplumber>=0.11,<0.12
+
+# Traz torch como dependencia. E o motivo de este arquivo existir separado.
+sentence-transformers>=5.0,<6.0

@@ -43,9 +43,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
-import unicodedata
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -59,6 +57,7 @@ from src.config import (  # noqa: E402
     PREFIXO_QUERY,
     SITUACAO_VIGENTE,
 )
+from src.embedder import Embedder, tokenizar  # noqa: E402
 from src.glossario import expandir  # noqa: E402
 
 # Fusão de rankings (RRF). O 60 é o valor da publicação original e não foi ajustado ao
@@ -79,17 +78,6 @@ FATOR_FOLGA = 4
 # e desprezivel -- 8 trechos de ~600 caracteres dao ~1.200 tokens de contexto --, e passar de
 # 8 comeca a encher a interface de texto que o usuario nao vai ler.
 K_PADRAO = 8
-
-
-def tokenizar(texto: str) -> list[str]:
-    """Tokens para a busca léxica: minúsculo, sem acento, sem pontuação.
-
-    Tirar o acento importa: quem digita "minigeracao" precisa casar com "minigeração", e o
-    BM25 compara token com token, sem a tolerância que o modelo de embedding tem.
-    """
-    sem_acento = unicodedata.normalize("NFKD", texto.lower())
-    sem_acento = "".join(c for c in sem_acento if not unicodedata.combining(c))
-    return re.findall(r"[a-z0-9]{2,}", sem_acento)
 
 
 def fundir_rrf(rankings: list[list[int]], k0: int = K_RRF) -> list[int]:
@@ -130,7 +118,7 @@ class Retriever:
     """Busca semantica sobre o indice FAISS pre-computado.
 
     O modelo e o indice sao carregados sob demanda e ficam em cache na instancia: dentro do
-    app, uma unica instancia atende todas as perguntas, sem recarregar 470 MB por requisicao.
+    app, uma unica instancia atende todas as perguntas, sem recarregar o modelo a cada uma.
     """
 
     def __init__(
@@ -178,10 +166,9 @@ class Retriever:
         return indice
 
     @cached_property
-    def modelo(self):
-        from sentence_transformers import SentenceTransformer
-
-        return SentenceTransformer(self.nome_modelo)
+    def modelo(self) -> Embedder:
+        """Vetorizador ONNX. Ver src/embedder.py para a medição que motivou largar o torch."""
+        return Embedder()
 
     @cached_property
     def bm25(self):
@@ -201,9 +188,7 @@ class Retriever:
     def _vetorizar(self, pergunta: str):
         # O prefixo "query: " vem de src/config.py, o mesmo arquivo que o build usou para o
         # "passage: ". Sao assimetricos de proposito e nao podem divergir.
-        return self.modelo.encode(
-            [PREFIXO_QUERY + pergunta], normalize_embeddings=True
-        ).astype("float32")
+        return self.modelo.vetorizar(PREFIXO_QUERY + pergunta)
 
     def preparar_consulta(self, pergunta: str) -> tuple[str, list[str]]:
         """Aplica o glossario, se ligado. Devolve (consulta, termos acrescentados)."""

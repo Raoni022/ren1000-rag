@@ -285,7 +285,62 @@ significa algo para quem lê. A posição na lista é que reflete a fusão.
 
 ---
 
-## 9. A verificação de citação não é opcional
+## 9. Largar o torch em runtime: ONNX quantizado
+
+O índice é pré-computado, então em produção o sistema vetoriza **uma pergunta por vez**.
+Carregar `torch` inteiro para isso custa caro e não entrega nada em troca. Medido:
+
+| | RSS de uma busca | pico | em disco |
+|---|---|---|---|
+| torch + sentence-transformers | 846 MB | 848 MB | ~790 MB |
+| ONNX fp32 | 789 MB | **884 MB** | ~50 MB |
+| ONNX int8 | **456 MB** | **456 MB** | ~50 MB |
+
+A fp32 foi descartada por medição: economiza 57 MB de RSS e tem pico **pior** que o torch. A
+int8 corta 46%. Com o Gradio junto, o app inteiro fica em **582 MB** (pico 617 MB) contra os
+~950 MB do caminho anterior.
+
+Em disco, o que sai são `torch` (494 MB), `transformers` (97 MB), `scipy`, `sympy` e `networkx`.
+O que entra são `onnxruntime` (43 MB) e `tokenizers` (7 MB). Daí a separação entre
+`requirements.txt` (runtime) e `requirements-build.txt` (construir o índice).
+
+### Quantização é arriscada, e por isso foi medida no lugar certo
+
+Trocar o codificador da pergunta por um que produz vetores diferentes dos que construíram o
+índice degradaria a busca sem levantar erro. A verificação não foi o cosseno isolado, e sim a
+bateria inteira:
+
+| | recuperação | posições por pergunta |
+|---|---|---|
+| torch | 7/7 | `{1:5, 2:8, 3:1, 4:1, 6:2, 7:2, 8:2}` |
+| ONNX fp32 | 7/7 | `{1:5, 2:8, 3:1, 4:1, 6:2, 7:2, 8:2}` |
+| ONNX int8 | 7/7 | `{1:5, 2:8, 3:1, 4:1, 6:2, 7:2, 8:2}` |
+
+Ranking idêntico artigo por artigo — inclusive na pergunta 2, cujo alvo está na posição 8, na
+fronteira do corte, e seria a primeira a cair.
+
+O ONNX vem do repositório **oficial** `intfloat/multilingual-e5-small`, não de conversão de
+terceiros: com o modelo original fora do runtime, uma conversão de origem desconhecida poderia
+divergir do que gerou o índice sem nada acusar.
+
+O lado dos documentos continua sendo indexado em fp32, com `sentence-transformers`. Ali o custo
+é pago uma vez, offline, e não há motivo para abrir mão de precisão.
+
+### O erro que quase virou conclusão errada
+
+A primeira medição indicou cosseno 0,9956 e recuperação caindo para 6/7 — o que teria matado a
+migração. Era defeito do meu teste, em dois pontos: eu passava a pergunta **já prefixada** para
+o `_vetorizar`, que prefixa de novo (`"query: query: ..."`), e no substituto do método eu tinha
+removido o prefixo por completo do lado ONNX. Com os dois lados corretos, o cosseno é
+`1,000000` e o ranking, idêntico.
+
+Vale registrar porque o modo de falha é característico: os prefixos assimétricos do E5 não
+levantam erro quando errados (seção 4), então um teste que os aplica errado produz um número
+plausível e uma conclusão falsa.
+
+---
+
+## 10. A verificação de citação não é opcional
 
 O princípio do projeto é que a IA nunca invente número de artigo. O prompt instrui isso, mas
 instrução reduz o erro e não o elimina — e esse erro é especialmente danoso aqui, porque a
@@ -301,7 +356,7 @@ hoje só o Art. 323, pelo Despacho ANEEL 2.006/2024).
 
 ---
 
-## 10. Como o resultado da bateria evoluiu
+## 11. Como o resultado da bateria evoluiu
 
 | Mudança | Recuperação | Aceitação |
 |---|---|---|
@@ -343,7 +398,7 @@ oito. Isso só se sabe refazendo a bateria completa.
 
 ---
 
-## 11. Limite de cota do free tier
+## 12. Limite de cota do free tier
 
 Cada pergunta consome ~2,5 mil tokens com `k=8`. O free tier da Groq dá **100 mil tokens por
 dia** para o `llama-3.3-70b-versatile` — ou seja, **algumas dezenas de perguntas por dia** num

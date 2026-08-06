@@ -19,7 +19,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.config import SITUACAO_REVOGADO, SITUACAO_SUPERADO, SITUACAO_VIGENTE  # noqa: E402
-from src.retriever import Retriever, fundir_rrf, tokenizar  # noqa: E402
+from src.retriever import Retriever, fundir_rrf  # noqa: E402
 
 falhas: list[str] = []
 
@@ -99,14 +99,6 @@ checar("pedir mais do que existe devolve o que ha", len(r2.buscar("q", k=99)), 2
 print("\nentradas degeneradas")
 checar("pergunta vazia devolve lista vazia", r.buscar(""), [])
 checar("pergunta so com espacos devolve lista vazia", r.buscar("   "), [])
-
-print("\ntokenizacao lexica: acento nao pode separar quem digita sem ele")
-checar("tira acento e minusculiza",
-       tokenizar("Minigeração Distribuída"), ["minigeracao", "distribuida"])
-checar("'minigeracao' e 'minigeração' viram o mesmo token",
-       tokenizar("minigeracao") == tokenizar("minigeração"), True)
-checar("descarta pontuacao e tokens de 1 letra",
-       tokenizar("Art. 655-C, § 1º:"), ["art", "655", "1o"])
 
 print("\nfusao RRF: usa a ordem, nunca a magnitude dos scores")
 checar("item bem colocado nas duas listas vence",
