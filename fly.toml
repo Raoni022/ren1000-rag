@@ -1,0 +1,43 @@
+# Configuração do Fly.io. Ajuste `app` para o nome que você registrar com `fly launch`.
+
+app = "ren1000-rag"
+primary_region = "gru"  # São Paulo: o público-alvo está no Brasil
+
+[build]
+
+[http_service]
+  internal_port = 7860
+  force_https = true
+
+  # A máquina dorme quando ninguém está usando e acorda na primeira requisição. Numa demo de
+  # portfólio isso é a diferença entre pagar pelo uso e pagar pelo tempo. O custo é um cold
+  # start de alguns segundos -- aceitável aqui, e o modelo já vem embutido na imagem, então
+  # acordar não implica baixar 113 MB.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    # O app carrega modelo e índice uma vez por máquina e responde uma pergunta por vez.
+    # Limites baixos evitam que várias perguntas simultâneas disputem a mesma CPU e estourem
+    # a memória da instância.
+    soft_limit = 4
+    hard_limit = 8
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # Medido: 582 MB de RSS com Gradio, pico de 617 MB. 512 MB NÃO cabe.
+  memory = "1gb"
+
+[checks]
+  [checks.http]
+    type = "http"
+    port = 7860
+    method = "GET"
+    path = "/"
+    # O primeiro boot carrega o índice e a sessão ONNX; sem essa folga o Fly mataria a
+    # máquina antes de ela ficar pronta.
+    grace_period = "60s"
+    interval = "30s"
+    timeout = "10s"

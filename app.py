@@ -195,5 +195,13 @@ with gr.Blocks(title=TITULO) as demo:
 
 
 if __name__ == "__main__":
-    # No Gradio 6 o tema saiu do construtor do Blocks para o launch().
-    demo.launch(theme=gr.themes.Soft())
+    demo.launch(
+        # No Gradio 6 o tema saiu do construtor do Blocks para o launch().
+        theme=gr.themes.Soft(),
+        # Dentro de container é preciso escutar em 0.0.0.0: no padrão 127.0.0.1 o processo
+        # sobe normalmente e nada de fora alcança, o que aparece como health check falhando
+        # sem nenhum erro no log da aplicação. O Dockerfile define as duas variáveis; em
+        # desenvolvimento local o padrão continua sendo localhost.
+        server_name=os.getenv("GRADIO_SERVER_NAME", "127.0.0.1"),
+        server_port=int(os.getenv("PORT", "7860")),
+    )

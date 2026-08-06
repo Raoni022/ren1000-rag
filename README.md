@@ -1,15 +1,3 @@
----
-title: Busca na REN ANEEL 1.000/2021
-emoji: ⚡
-colorFrom: blue
-colorTo: green
-sdk: gradio
-sdk_version: 6.22.0
-app_file: app.py
-pinned: false
-license: mit
----
-
 # Busca semântica na REN ANEEL 1.000/2021
 
 Pergunte em português sobre a norma que rege a distribuição de energia elétrica no Brasil —
@@ -273,22 +261,43 @@ O registro completo do que foi medido, decidido e **descartado** está em
 | 6 | Interface Gradio | **concluído** — degrada para busca sem chave |
 | 7 | Bateria de aceitação | **concluído** — 8/10, 0 alucinações |
 | 8 | README | **concluído** |
-| 9 | Deploy no Hugging Face Spaces | a fazer — falta criar o Space e configurar os secrets |
+| 9 | Deploy | Dockerfile e fly.toml prontos e testados em container; falta publicar |
 
-### Publicar no Hugging Face Spaces
+### Publicar
 
-O frontmatter no topo deste README já é a configuração do Space. Falta:
+O `Dockerfile` e o `fly.toml` estão prontos e foram exercitados localmente: a imagem constrói,
+sobe com limite de 1 GB e responde.
 
-1. Criar o Space em [huggingface.co/new-space](https://huggingface.co/new-space), SDK Gradio.
-2. Definir três **secrets** do Space (nunca no repositório): `LLM_API_KEY`, `LLM_BASE_URL`,
-   `LLM_MODEL`.
-3. `git push` deste repositório para o remoto do Space.
+```bash
+fly launch --no-deploy          # confirme o nome em fly.toml
+fly secrets set LLM_API_KEY=... LLM_BASE_URL=... LLM_MODEL=...
+fly deploy
+```
 
-O índice já vai versionado (`index/`, 3,8 MB), então nada é recalculado — só o ONNX quantizado
-(113 MB) é baixado na primeira execução.
+O índice vai versionado e o modelo ONNX é **embutido na imagem durante o build** — nenhuma
+máquina nova baixa nada ao acordar, e o app não depende do Hub estar no ar em produção.
 
-**Requisito de memória: ~600 MB.** Isso vale para qualquer hospedagem, não só o Space. Cabe
-folgado em instância de 1 GB; **não cabe** em tier de 512 MB.
+O build faz duas verificações que falham cedo em vez de em produção: vetoriza uma frase de
+teste (se o pipeline de pooling estiver errado, o build quebra) e confere que o índice FAISS e
+o `chunks.json` têm o mesmo tamanho.
+
+**Memória: 568 MiB medidos em container com limite de 1 GB** (55%). Cabe folgado em 1 GB;
+**não cabe** em tier de 512 MB. Vale para qualquer hospedagem, não só o Fly.
+
+O `fly.toml` deixa a máquina dormir quando ninguém usa (`auto_stop_machines`), o que numa demo
+de portfólio é a diferença entre pagar pelo uso e pagar pelo tempo. O custo é um cold start de
+alguns segundos.
+
+Para construir a imagem localmente:
+
+```bash
+docker build --secret id=hf_token,env=HF_TOKEN -t ren1000-rag .
+docker run --rm -p 7860:7860 --env-file .env ren1000-rag
+```
+
+O `HF_TOKEN` é opcional — o repositório do modelo é público, e ele só evita o limite de taxa do
+download anônimo. Vai por **secret mount**, nunca por `ARG`: um `ARG` fica gravado em texto
+plano no histórico da imagem e qualquer pessoa com ela lê o segredo.
 
 **Sobre a cota:** cada pergunta consome ~2,5 mil tokens e o free tier da Groq dá 100 mil por
 dia, ou seja, algumas dezenas de perguntas diárias. Ao esgotar, o app avisa em português e

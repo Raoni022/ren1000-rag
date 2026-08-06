@@ -1,0 +1,25 @@
+# Só entra na imagem o que o app precisa para responder. O Dockerfile copia explicitamente
+# src/, index/ e app.py; isto aqui evita que um COPY futuro arraste o resto sem querer, e
+# encurta o contexto enviado ao builder.
+
+.venv/
+__pycache__/
+*.py[cod]
+
+.git/
+.github/
+.claude/
+
+# O PDF de 4,8 MB e o texto extraído são insumos do build do índice, não do runtime.
+data/
+
+# Documentação, testes e scripts de build não sobem para produção.
+docs/
+tests/
+scripts/
+*.md
+!README.md
+
+.env
+.env.example
+requirements-build.txt
