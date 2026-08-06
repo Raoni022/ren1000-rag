@@ -1,12 +1,17 @@
 # Busca semântica na REN ANEEL 1.000/2021
 
+### ▶ Demo no ar: **[ren1000-rag.fly.dev](https://ren1000-rag.fly.dev/)**
+
 Pergunte em português sobre a norma que rege a distribuição de energia elétrica no Brasil —
 incluindo micro e minigeração distribuída — e receba uma resposta curta **citando o artigo**,
 com o trecho original da norma ao lado para conferência.
 
-> **Blocos 1 a 7 de 9 concluídos.** O sistema roda ponta a ponta e passa na bateria de
-> aceitação com **8/10 e zero citações inventadas** ([relatório](docs/AVALIACAO.md)). Falta o
-> deploy público.
+> **Projeto concluído**, dos 9 blocos planejados ao deploy público. Passa na bateria de
+> aceitação com **8/10 e zero citações inventadas** ([relatório](docs/AVALIACAO.md)).
+>
+> A máquina dorme quando ninguém está usando, então a primeira pergunta pode levar alguns
+> segundos a mais. Se a cota diária do LLM acabar, o app avisa e continua funcionando como
+> busca — a recuperação não depende de API paga.
 
 ```
 Pergunta:  Por quanto tempo valem os créditos de energia?
@@ -14,7 +19,7 @@ Pergunta:  Por quanto tempo valem os créditos de energia?
 Resposta:  Os créditos de energia expiram em 60 meses após a data do
            faturamento em que foram gerados, Art. 655-L.
 
-Fonte:     Art. 655-L · similaridade 0.884
+Fonte:     Art. 655-L · similaridade semântica 0.881
            Título II - PARTE ESPECIAL › Capítulo XI - DA MICROGERAÇÃO E
            MINIGERAÇÃO DISTRIBUÍDA E DO SISTEMA DE COMPENSAÇÃO DE ENERGIA
            ELÉTRICA (SCEE) › Seção I - Da conexão de microgeração e
@@ -261,18 +266,23 @@ O registro completo do que foi medido, decidido e **descartado** está em
 | 6 | Interface Gradio | **concluído** — degrada para busca sem chave |
 | 7 | Bateria de aceitação | **concluído** — 8/10, 0 alucinações |
 | 8 | README | **concluído** |
-| 9 | Deploy | Dockerfile e fly.toml prontos e testados em container; falta publicar |
+| 9 | Deploy | **concluído** — [ren1000-rag.fly.dev](https://ren1000-rag.fly.dev/), região `gru` |
 
 ### Publicar
 
-O `Dockerfile` e o `fly.toml` estão prontos e foram exercitados localmente: a imagem constrói,
-sobe com limite de 1 GB e responde.
+Rodando no Fly.io em São Paulo (`gru`), imagem de 252 MB comprimida.
 
 ```bash
-fly launch --no-deploy          # confirme o nome em fly.toml
-fly secrets set LLM_API_KEY=... LLM_BASE_URL=... LLM_MODEL=...
-fly deploy
+cd ren1000-rag                   # os comandos leem fly.toml e Dockerfile do diretório atual
+flyctl launch --no-deploy --copy-config --name SEU-APP --region gru
+flyctl secrets set LLM_API_KEY=... LLM_BASE_URL=... LLM_MODEL=...
+flyctl deploy
 ```
+
+Três tropeços que custaram tempo, caso você reproduza: no Windows o binário chama-se `flyctl`,
+não `fly`; rodar de outro diretório faz o `flyctl` gerar um `fly.toml` no lugar errado, com a
+porta padrão 8080 em vez da 7860 deste app; e `secrets set` exige que o app já exista, mas
+reporta a ausência dele como se faltasse o campo `app` no arquivo.
 
 O índice vai versionado e o modelo ONNX é **embutido na imagem durante o build** — nenhuma
 máquina nova baixa nada ao acordar, e o app não depende do Hub estar no ar em produção.
