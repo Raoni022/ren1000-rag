@@ -17,12 +17,17 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from build_index import (  # noqa: E402
-    MODELO_PADRAO,
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from build_index import carregar_chunks, construir_indice  # noqa: E402
+
+# Os prefixos vêm de src/config.py, que é a fonte única lida pelo build e pelo runtime.
+# Importá-los daqui, e não de build_index, é o que faz o teste falhar caso alguém volte a
+# duplicar a definição no script -- que é justamente o erro que essa fonte única evita.
+from src.config import (  # noqa: E402
+    MODELO_EMBEDDING as MODELO_PADRAO,
     PREFIXO_PASSAGE,
     PREFIXO_QUERY,
-    carregar_chunks,
-    construir_indice,
 )
 
 falhas: list[str] = []

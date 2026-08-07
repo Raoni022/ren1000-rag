@@ -49,7 +49,6 @@ from __future__ import annotations
 import re
 import unicodedata
 from functools import cached_property
-from pathlib import Path
 
 import numpy as np
 

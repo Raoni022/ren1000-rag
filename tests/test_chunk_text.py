@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from chunk_text import (  # noqa: E402
     SITUACAO_REVOGADO,
-    SITUACAO_SUPERADO,
     SITUACAO_VIGENTE,
     Unidade,
     agrupar,

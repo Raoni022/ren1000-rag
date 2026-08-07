@@ -100,6 +100,13 @@ print("\nentradas degeneradas")
 checar("pergunta vazia devolve lista vazia", r.buscar(""), [])
 checar("pergunta so com espacos devolve lista vazia", r.buscar("   "), [])
 
+print("\no parametro 'modelo' chega mesmo ao vetorizador")
+# Guarda contra regressao: apos a migracao para ONNX o parametro ficou sendo guardado e nunca
+# lido, entao pedir outro modelo era silenciosamente ignorado.
+r_mod = montar([SITUACAO_VIGENTE])
+r_mod.nome_modelo = "algum/outro-modelo"
+checar("Retriever repassa o repo ao Embedder", r_mod.modelo.repo, "algum/outro-modelo")
+
 print("\nfusao RRF: usa a ordem, nunca a magnitude dos scores")
 checar("item bem colocado nas duas listas vence",
        fundir_rrf([[7, 1, 2], [7, 3, 4]])[0], 7)

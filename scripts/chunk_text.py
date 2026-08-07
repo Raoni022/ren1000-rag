@@ -498,7 +498,7 @@ def main() -> int:
     print(f"  revogados ................ {por_situacao[SITUACAO_REVOGADO]}")
     print(f"  redacao anterior ......... {por_situacao[SITUACAO_SUPERADO]} "
           f"(superada por 'Redação dada')")
-    print(f"Tamanho do chunk (chars):")
+    print("Tamanho do chunk (chars):")
     print(f"  mediana .................. {statistics.median(tamanhos):.0f}")
     print(f"  p90 / p99 ................ {tamanhos[int(len(tamanhos) * .9)]} / "
           f"{tamanhos[int(len(tamanhos) * .99)]}")

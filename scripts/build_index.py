@@ -62,7 +62,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import (  # noqa: E402
     MODELO_EMBEDDING as MODELO_PADRAO,
     PREFIXO_PASSAGE,
-    PREFIXO_QUERY,
 )
 
 

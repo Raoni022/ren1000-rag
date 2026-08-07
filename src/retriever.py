@@ -168,7 +168,7 @@ class Retriever:
     @cached_property
     def modelo(self) -> Embedder:
         """Vetorizador ONNX. Ver src/embedder.py para a medição que motivou largar o torch."""
-        return Embedder()
+        return Embedder(repo=self.nome_modelo)
 
     @cached_property
     def bm25(self):

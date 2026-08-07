@@ -258,6 +258,30 @@ O registro completo do que foi medido, decidido e **descartado** está em
   errada: o primeiro teste indicava degradação, mas o defeito estava no próprio teste, que
   prefixava a pergunta duas vezes.
 
+## Como este projeto foi construído
+
+Com assistência de IA, em pares — e o histórico de commits registra isso com
+`Co-Authored-By`. Vale explicitar o que foi meu, porque é o que o resultado não mostra
+sozinho.
+
+**As decisões foram minhas.** Escolher esta norma, que já sustento em produção em outro
+sistema. Fixar o princípio de que a IA nunca inventa número de artigo, que veio de lá. Exigir
+que a busca não dependesse de API paga. Aprovar a troca de biblioteca de extração e a
+dependência nova da busca híbrida **só depois de ver a medição**. Recusar reescrever as
+perguntas de teste no vocabulário da norma, o que teria subido a métrica sem melhorar nada
+para quem usa.
+
+**O método foi imposto, não emergiu.** A regra do projeto foi um bloco por sessão, terminado
+antes do próximo, e nenhuma mudança de recuperação sem régua. Foi essa regra que fez a
+`scripts/avaliar.py` existir antes das otimizações — e é por isso que este repositório sabe
+dizer quais hipóteses foram **refutadas**, e não só quais funcionaram.
+
+Uso de IA para escrever código é hoje ferramenta padrão, e num projeto de automação com IA
+esconder isso seria estranho. O que diferencia não é quem digitou: é ter medido antes de
+implementar, ter descartado o que não se sustentou e ter registrado os erros do caminho —
+inclusive um teste meu que quase me convenceu de uma conclusão falsa
+([decisões técnicas, seção 9](docs/DECISOES_TECNICAS.md)).
+
 ## Progresso
 
 | # | Bloco | Status |
